@@ -10,7 +10,7 @@ export default function Header() {
         🐱 Kitty
       </a>
       <div className="flex items-center gap-3">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+        <span className={`text-sm font-medium px-3 py-2 rounded-lg border ${
           isMainnet
             ? 'bg-green-500/10 text-green-400 border-green-500/20'
             : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
