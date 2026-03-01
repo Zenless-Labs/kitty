@@ -1,13 +1,14 @@
 import { Transaction } from '@mysten/sui/transactions';
 
-export const PACKAGE_ID = '0x_PLACEHOLDER';
+export const PACKAGE_ID = process.env.NEXT_PUBLIC_PACKAGE_ID ?? "0x_PLACEHOLDER";
 export const MODULE_NAME = 'crowdfund';
 
 export interface CreateEventParams {
+  titleEncrypted: number[];
   encryptedParticipants: number[];
   passwordHash: number[];
   names: string[];
-  goalMist: bigint;
+  goalUsdCents: number;
   deadline: bigint;
 }
 
@@ -26,10 +27,11 @@ export function buildCreateEvent(p: CreateEventParams): Transaction {
   tx.moveCall({
     target: `${PACKAGE_ID}::${MODULE_NAME}::create_event`,
     arguments: [
+      tx.pure.vector('u8', p.titleEncrypted),
       tx.pure.vector('u8', p.encryptedParticipants),
       tx.pure.vector('u8', p.passwordHash),
       tx.pure.vector('string', p.names),
-      tx.pure.u64(p.goalMist),
+      tx.pure.u64(p.goalUsdCents),
       tx.pure.u64(p.deadline),
     ],
   });
