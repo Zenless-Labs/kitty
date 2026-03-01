@@ -4,7 +4,6 @@ export const PACKAGE_ID = '0x_PLACEHOLDER';
 export const MODULE_NAME = 'crowdfund';
 
 export interface CreateEventParams {
-  creatorCapId: string;
   encryptedParticipants: number[];
   passwordHash: number[];
   names: string[];
@@ -27,7 +26,6 @@ export function buildCreateEvent(p: CreateEventParams): Transaction {
   tx.moveCall({
     target: `${PACKAGE_ID}::${MODULE_NAME}::create_event`,
     arguments: [
-      tx.object(p.creatorCapId),
       tx.pure.vector('u8', p.encryptedParticipants),
       tx.pure.vector('u8', p.passwordHash),
       tx.pure.vector('string', p.names),

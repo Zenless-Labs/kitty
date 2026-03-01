@@ -14,7 +14,6 @@ export default function CreatePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [goalSui, setGoalSui] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [creatorCapId, setCreatorCapId] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +22,6 @@ export default function CreatePage() {
     e.preventDefault();
     setError(null);
     if (password !== confirmPassword) { setError('Passwords do not match'); return; }
-    if (!account) { setError('Connect your wallet first'); return; }
 
     setLoading(true);
     try {
@@ -33,18 +31,13 @@ export default function CreatePage() {
       const salt = Date.now().toString();
       const encrypted = await encryptNames(nameList, password, salt);
       const pwHash = await hashPassword(password);
-
-      // Store salt alongside encrypted data (prepend as 16-char hex padded)
-      const saltHex = Array.from(new TextEncoder().encode(salt.padStart(16, '0')))
-        .map(b => b.toString(16).padStart(2, '0')).join('');
-      const fullData = saltHex + encrypted;
-      const encBytes = Array.from(new TextEncoder().encode(fullData));
+      const saltBytes = Array.from(new TextEncoder().encode(salt.padStart(16, '0')));
+      const encBytes = [...saltBytes, ...Array.from(new TextEncoder().encode(encrypted))];
 
       const goalMist = BigInt(Math.round(parseFloat(goalSui) * 1_000_000_000));
-      const deadlineTs = deadline ? BigInt(new Date(deadline).getTime()) : 0n;
+      const deadlineTs = deadline ? BigInt(new Date(deadline).getTime()) : BigInt(0);
 
       const tx = buildCreateEvent({
-        creatorCapId,
         encryptedParticipants: encBytes,
         passwordHash: Array.from(pwHash),
         names: nameList,
@@ -71,11 +64,6 @@ export default function CreatePage() {
     <div className="max-w-lg mx-auto px-6 py-12">
       <h1 className="text-2xl font-bold mb-8">Create Crowdfund Event</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">CreatorCap Object ID</label>
-          <input value={creatorCapId} onChange={e => setCreatorCapId(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="0x..." required />
-        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Participants (one per line)</label>
           <textarea value={names} onChange={e => setNames(e.target.value)} rows={6}
@@ -108,7 +96,7 @@ export default function CreatePage() {
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {result && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-green-800 text-sm font-medium">Event created!</p>
+            <p className="text-green-800 text-sm font-medium">Event created! Share this tx digest with your team.</p>
             <p className="text-green-700 text-xs font-mono mt-1 break-all">{result}</p>
           </div>
         )}

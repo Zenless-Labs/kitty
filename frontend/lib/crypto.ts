@@ -14,18 +14,22 @@ async function deriveKey(password: string, salt: string): Promise<CryptoKey> {
   );
 }
 
-function toHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+function toHex(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function fromHex(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
+function fromHex(hex: string): Uint8Array<ArrayBuffer> {
+  const ab = new ArrayBuffer(hex.length / 2);
+  const bytes = new Uint8Array(ab);
   for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   return bytes;
 }
 
 async function encryptData(data: string, key: CryptoKey): Promise<string> {
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const ivBuf = new ArrayBuffer(12);
+  const iv = new Uint8Array(ivBuf);
+  window.crypto.getRandomValues(iv);
   const enc = new TextEncoder();
   const ciphertext = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(data));
   return toHex(iv) + toHex(ciphertext);
@@ -49,7 +53,7 @@ export async function decryptNames(hexData: string, password: string, salt: stri
   return JSON.parse(plain);
 }
 
-export async function hashPassword(password: string): Promise<Uint8Array> {
+export async function hashPassword(password: string): Promise<Uint8Array<ArrayBuffer>> {
   const enc = new TextEncoder();
   const hash = await window.crypto.subtle.digest('SHA-256', enc.encode(password));
   return new Uint8Array(hash);
