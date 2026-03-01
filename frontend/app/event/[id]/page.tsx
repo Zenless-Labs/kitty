@@ -1,20 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
 import { decryptNames } from '@/lib/crypto';
-import { buildContributeSui, buildContributeSuiWithTip, buildMarkPaypal, PACKAGE_ID } from '@/lib/contract';
+import { buildContributeSui, buildContributeSuiWithTip } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 
-const STATUS_LABELS: Record<number, { label: string; color: string }> = {
-  0: { label: 'Pending', color: 'bg-gray-100 text-gray-700' },
-  1: { label: 'SUI ✓', color: 'bg-green-100 text-green-700' },
-  2: { label: 'Paypal ✓', color: 'bg-blue-100 text-blue-700' },
-};
+const STATUS = {
+  0: { label: 'Pending', cls: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
+  1: { label: 'SUI ✓',   cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+  2: { label: 'PayPal ✓',cls: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+} as Record<number, {label:string;cls:string}>;
 
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { price, usdToSui } = useSuiPrice();
@@ -24,8 +25,8 @@ export default function EventPage() {
   });
 
   const [password, setPassword] = useState('');
-  const [title, setTitle] = useState<string | null>(null);
   const [names, setNames] = useState<string[] | null>(null);
+  const [title, setTitle] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, number>>({});
   const [unlockError, setUnlockError] = useState('');
   const [selectedName, setSelectedName] = useState('');
@@ -33,35 +34,27 @@ export default function EventPage() {
   const [tipSui, setTipSui] = useState('0.01');
   const [txLoading, setTxLoading] = useState(false);
 
-  // Fetch the CrowdFundEvent object from chain
   const { data: objData, isLoading, refetch } = useSuiClientQuery('getObject', {
-    id,
-    options: { showContent: true },
+    id, options: { showContent: true },
   });
 
   const fields = (objData?.data?.content as any)?.fields ?? null;
-
-  // Derived values from on-chain data
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
   const poolSui = (poolMist / 1_000_000_000).toFixed(3);
   const isActive: boolean = fields?.active ?? true;
   const deadline: number = fields ? parseInt(fields.deadline) : 0;
+  const isOrganizer = account?.address === fields?.organizer;
 
-  // statuses from VecMap: { keys: [...], values: [...] }
   const onChainStatuses: Record<string, number> = {};
   if (fields?.statuses) {
     const contents: any[] = fields.statuses.fields?.contents ?? [];
-    contents.forEach((entry: any) => {
-      onChainStatuses[entry.fields.key] = parseInt(entry.fields.value);
-    });
+    contents.forEach((e: any) => { onChainStatuses[e.fields.key] = parseInt(e.fields.value); });
   }
   const resolvedStatuses = Object.keys(statuses).length > 0 ? statuses : onChainStatuses;
   const paidCount = Object.values(resolvedStatuses).filter(s => s > 0).length;
-  const totalCount = Object.keys(resolvedStatuses).length;
-
-  // Per-person SUI amount based on goal and participant count
+  const totalCount = names?.length ?? Object.keys(resolvedStatuses).length;
   const perPersonUsd = totalCount > 0 ? goalUsdCents / 100 / totalCount : 0;
   const perPersonSui = usdToSui(perPersonUsd);
 
@@ -69,47 +62,39 @@ export default function EventPage() {
     e.preventDefault();
     setUnlockError('');
     try {
-      if (!fields) throw new Error('Event not loaded');
+      if (!fields) throw new Error('not loaded');
       const encHex: number[] = fields.encrypted_participants;
-      // First 16 bytes are the salt (padded), rest is the encrypted blob
-      const saltBytes = encHex.slice(0, 16);
-      const salt = new TextDecoder().decode(new Uint8Array(saltBytes)).replace(/\0/g, '').replace(/^0+/, '').trim();
+      const salt = new TextDecoder().decode(new Uint8Array(encHex.slice(0, 16))).replace(/\0/g, '').replace(/^0+/, '').trim();
       const encData = new TextDecoder().decode(new Uint8Array(encHex.slice(16)));
       const decrypted = await decryptNames(encData, password, salt);
-
-      // Decrypt title
-      try {
-        const titleHex: number[] = fields.title_encrypted;
-        const titleSaltBytes = titleHex.slice(0, 24);
-        const titleSaltRaw = new TextDecoder().decode(new Uint8Array(titleSaltBytes)).replace(/\0/g, '').replace(/^0+/, '').trim();
-        const titleEncData = new TextDecoder().decode(new Uint8Array(titleHex.slice(24)));
-        const titleArr = await decryptNames(titleEncData, password, titleSaltRaw);
-        setTitle(titleArr[0] ?? null);
-      } catch { setTitle(null); }
-      // Sync statuses from on-chain
       setStatuses(onChainStatuses);
       setNames(decrypted);
-    } catch {
-      setUnlockError('Wrong password or could not decrypt');
-    }
+      try {
+        const titleHex: number[] = fields.title_encrypted;
+        const titleSalt = new TextDecoder().decode(new Uint8Array(titleHex.slice(0, 24))).replace(/\0/g, '').replace(/^0+/, '').trim();
+        const titleArr = await decryptNames(new TextDecoder().decode(new Uint8Array(titleHex.slice(24))), password, titleSalt);
+        setTitle(titleArr[0] ?? null);
+      } catch { /* title optional */ }
+
+      // If organizer, redirect to dashboard after unlock
+      if (isOrganizer) router.push(`/event/${id}/organizer`);
+    } catch { setUnlockError('Wrong password'); }
   }
 
   async function execTx(tx: any) {
     tx.setSender(account!.address);
     tx.setExpiration({ None: true } as any);
     const bytes = await tx.build({ client });
-    const b64 = btoa(String.fromCharCode(...bytes));
-    const res = await signAndExecute({ transaction: b64 as any });
+    await signAndExecute({ transaction: btoa(String.fromCharCode(...bytes)) as any });
     await refetch();
-    return res;
   }
 
-  async function handleContributeSui() {
+  async function handleContribute() {
     if (!selectedName || !amountSui) return;
     setTxLoading(true);
     try {
-      const amountMist = BigInt(Math.round(parseFloat(amountSui) * 1_000_000_000));
-      const tipMist = tipSui ? BigInt(Math.round(parseFloat(tipSui) * 1_000_000_000)) : 0n;
+      const amountMist = BigInt(Math.round(parseFloat(amountSui) * 1e9));
+      const tipMist = tipSui ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
       const tx = tipMist > 0n
         ? buildContributeSuiWithTip({ eventId: id, name: selectedName, amountMist, tipMist })
         : buildContributeSui({ eventId: id, name: selectedName, amountMist });
@@ -120,81 +105,73 @@ export default function EventPage() {
     finally { setTxLoading(false); }
   }
 
-  async function handleMarkPaypal() {
-    if (!selectedName) return;
-    setTxLoading(true);
-    try {
-      const tx = buildMarkPaypal(id, selectedName);
-      await execTx(tx);
-      setStatuses(prev => ({ ...prev, [selectedName]: 2 }));
-      setSelectedName('');
-    } catch (err) { alert(String(err)); }
-    finally { setTxLoading(false); }
-  }
+  const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
 
-  if (isLoading) return <div className="max-w-2xl mx-auto px-6 py-24 text-center text-gray-400">Loading event…</div>;
-  if (!fields) return <div className="max-w-2xl mx-auto px-6 py-24 text-center text-red-500">Event not found: {id}</div>;
+  if (isLoading) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">Loading…</div>;
+  if (!fields) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-red-400">Event not found</div>;
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
-      <p className="text-xs text-gray-400 font-mono mb-1">Event</p>
-      {title && <h1 className="text-2xl font-bold mb-1">{title}</h1>}
-      <p className="text-xs text-gray-400 font-mono mb-2 break-all">{id}</p>
-      {!isActive && <span className="inline-block mb-4 text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">Closed</span>}
-
-      <div className="bg-white border rounded-lg p-4 mb-8 grid grid-cols-4 gap-4 text-center">
-        <div><p className="text-xs text-gray-500">Goal</p><p className="font-semibold">${goalUsd}</p></div>
-        <div><p className="text-xs text-gray-500">Per person</p>
-          <p className="font-semibold">{perPersonSui ? `${perPersonSui.toFixed(2)} SUI` : `$${perPersonUsd.toFixed(2)}`}</p></div>
-        <div><p className="text-xs text-gray-500">Pool</p><p className="font-semibold">{poolSui} SUI</p></div>
-        <div><p className="text-xs text-gray-500">Paid</p><p className="font-semibold">{paidCount}/{totalCount}</p></div>
-      </div>
-
-      {deadline > 0 && (
-        <p className="text-sm text-gray-500 mb-6">Deadline: {new Date(deadline).toLocaleDateString()}</p>
+      {title
+        ? <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">{title}</h1>
+        : <h1 className="text-3xl font-bold mb-1 text-gray-200">Event</h1>}
+      <p className="text-xs font-mono text-gray-500 mb-2 break-all">{id}</p>
+      {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
+      {isOrganizer && names === null && (
+        <div className="mt-3 mb-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 inline-block">
+          🔑 You are the organizer — unlock to go to your dashboard
+        </div>
       )}
 
+      <div className="grid grid-cols-4 gap-3 my-6">
+        {[
+          { label: 'Goal', value: `$${goalUsd}` },
+          { label: 'Per person', value: perPersonSui ? `${perPersonSui.toFixed(2)} SUI` : `$${perPersonUsd.toFixed(2)}` },
+          { label: 'Pool', value: `${poolSui} SUI` },
+          { label: 'Paid', value: `${paidCount}/${totalCount}` },
+        ].map(s => (
+          <div key={s.label} className="card p-3 text-center">
+            <p className="text-xs text-gray-500 mb-1">{s.label}</p>
+            <p className="font-semibold text-sm text-white">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {deadline > 0 && <p className="text-sm text-gray-500 mb-6">Deadline: {new Date(deadline).toLocaleDateString()}</p>}
+
       {!names ? (
-        <form onSubmit={handleUnlock} className="bg-white border rounded-lg p-6">
-          <h2 className="font-semibold mb-4">Enter password to view participants</h2>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm mb-3" placeholder="Event password" />
-          {unlockError && <p className="text-red-600 text-sm mb-3">{unlockError}</p>}
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-            Unlock
-          </button>
-        </form>
+        <div className="card p-6">
+          <h2 className="font-semibold text-white mb-4">Enter password to view participants</h2>
+          <form onSubmit={handleUnlock} className="space-y-3">
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              className={inputCls} placeholder="Event password" />
+            {unlockError && <p className="text-red-400 text-sm">{unlockError}</p>}
+            <button type="submit" className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 transition">
+              Unlock
+            </button>
+          </form>
+        </div>
       ) : (
-        <div className="space-y-6">
-          <div className="bg-white border rounded-lg overflow-hidden">
+        <div className="space-y-4">
+          <div className="card overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="border-b border-white/10">
                 <tr>
-                  <th className="text-left px-4 py-2">Name</th>
-                  <th className="text-left px-4 py-2">Status</th>
-                  <th className="px-4 py-2" />
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Name</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {names.map(name => {
                   const status = resolvedStatuses[name] ?? 0;
+                  const s = STATUS[status];
                   return (
                     <tr key={name}
-                      className={`border-b last:border-0 hover:bg-gray-50 ${status === 0 && isActive ? 'cursor-pointer' : ''}`}
-                      onClick={() => {
-                        if (status === 0 && isActive) {
-                          setSelectedName(name);
-                          if (perPersonSui) setAmountSui(perPersonSui.toFixed(3));
-                        }
-                      }}>
-                      <td className="px-4 py-3 font-medium">{name}</td>
+                      className={`border-b border-white/5 last:border-0 transition ${status === 0 && isActive ? 'cursor-pointer hover:bg-white/5' : ''} ${selectedName === name ? 'bg-blue-500/10' : ''}`}
+                      onClick={() => { if (status === 0 && isActive) { setSelectedName(name); if (perPersonSui) setAmountSui(perPersonSui.toFixed(3)); } }}>
+                      <td className="px-4 py-3 font-medium text-white">{name}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[status].color}`}>
-                          {STATUS_LABELS[status].label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {selectedName === name && <span className="text-blue-600 text-xs">selected</span>}
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.cls}`}>{s.label}</span>
                       </td>
                     </tr>
                   );
@@ -204,35 +181,31 @@ export default function EventPage() {
           </div>
 
           {selectedName && isActive && (
-            <div className="bg-white border rounded-lg p-6">
-              <h2 className="font-semibold mb-1">Contribute as <span className="text-blue-600">{selectedName}</span></h2>
-              {perPersonSui && (
+            <div className="card p-5">
+              <h2 className="font-semibold text-white mb-1">Contributing as <span className="text-blue-400">{selectedName}</span></h2>
+              {perPersonSui && price && (
                 <p className="text-sm text-gray-500 mb-4">
-                  Suggested: {perPersonSui.toFixed(3)} SUI ≈ ${perPersonUsd.toFixed(2)}
-                  {price && <span className="text-xs text-gray-400 ml-1">(SUI ${price.toFixed(3)})</span>}
+                  Suggested {perPersonSui.toFixed(3)} SUI ≈ ${perPersonUsd.toFixed(2)} · SUI ${price.toFixed(3)}
                 </p>
               )}
-              {!account && <p className="text-sm text-gray-500 mb-4">Connect wallet to contribute</p>}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label className="text-xs text-gray-600 mb-1 block">Amount (SUI)</label>
-                  <input type="number" step="0.001" min="0" value={amountSui} onChange={e => setAmountSui(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  <label className="text-xs text-gray-400 mb-1 block">Amount (SUI)</label>
+                  <input type="number" step="0.001" min="0" value={amountSui}
+                    onChange={e => setAmountSui(e.target.value)} className={inputCls}
                     placeholder={perPersonSui?.toFixed(3) ?? '0'} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-600 mb-1 block">Tip for organizer (optional)</label>
-                  <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0.1" />
+                  <label className="text-xs text-gray-400 mb-1 block">Tip for organizer</label>
+                  <input type="number" step="0.01" min="0" value={tipSui}
+                    onChange={e => setTipSui(e.target.value)} className={inputCls} />
                 </div>
               </div>
-              <div className="flex gap-3">
-                <button onClick={handleContributeSui} disabled={txLoading || !account}
-                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                  {txLoading ? 'Sending…' : 'Pay with SUI'}
-                </button>
-
-              </div>
+              <button onClick={handleContribute} disabled={txLoading || !account}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 disabled:opacity-40 transition">
+                {txLoading ? 'Sending…' : 'Pay with SUI'}
+              </button>
+              {!account && <p className="text-sm text-gray-500 mt-2 text-center">Connect wallet to pay with SUI</p>}
             </div>
           )}
         </div>

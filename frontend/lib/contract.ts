@@ -1,7 +1,7 @@
 import { Transaction } from '@mysten/sui/transactions';
 
 export const PACKAGE_ID = process.env.NEXT_PUBLIC_PACKAGE_ID ?? "0x_PLACEHOLDER";
-export const MODULE_NAME = 'crowdfund';
+export const MODULE_NAME = 'kitty';
 
 export interface CreateEventParams {
   titleEncrypted: number[];
@@ -81,6 +81,15 @@ export function buildCloseEvent(eventId: string): Transaction {
   tx.moveCall({
     target: `${PACKAGE_ID}::${MODULE_NAME}::close_event`,
     arguments: [tx.object(eventId)],
+  });
+  return tx;
+}
+
+export function buildMarkPaypalBatch(eventId: string, names: string[]): Transaction {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::${MODULE_NAME}::mark_paypal_batch`,
+    arguments: [tx.object(eventId), tx.pure.vector('string', names)],
   });
   return tx;
 }

@@ -3,15 +3,15 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
-import { buildWithdraw, buildCloseEvent, buildMarkPaypal } from '@/lib/contract';
+import { buildWithdraw, buildCloseEvent, buildMarkPaypal, buildMarkPaypalBatch } from '@/lib/contract';
 import { decryptNames } from '@/lib/crypto';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 
-const STATUS_LABELS: Record<number, { label: string; color: string }> = {
-  0: { label: 'Pending', color: 'bg-red-100 text-red-700' },
-  1: { label: 'SUI ✓', color: 'bg-green-100 text-green-700' },
-  2: { label: 'Paypal ✓', color: 'bg-blue-100 text-blue-700' },
-};
+const STATUS = {
+  0: { label: 'Pending',  cls: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
+  1: { label: 'SUI ✓',   cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+  2: { label: 'PayPal ✓',cls: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+} as Record<number, {label:string;cls:string}>;
 
 export default function OrganizerPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +29,7 @@ export default function OrganizerPage() {
   const [statuses, setStatuses] = useState<Record<string, number>>({});
   const [unlockError, setUnlockError] = useState('');
   const [txLoading, setTxLoading] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const { data: objData, isLoading, refetch } = useSuiClientQuery('getObject', {
     id, options: { showContent: true },
@@ -39,54 +40,48 @@ export default function OrganizerPage() {
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
   const tipMist: number = fields ? parseInt(fields.tip?.fields?.value ?? fields.tip ?? '0') : 0;
-  const poolSui = (poolMist / 1_000_000_000).toFixed(3);
-  const tipSui = (tipMist / 1_000_000_000).toFixed(3);
+  const poolSui = (poolMist / 1e9).toFixed(3);
+  const tipSui = (tipMist / 1e9).toFixed(3);
   const isActive: boolean = fields?.active ?? true;
   const isOrganizer = account?.address === fields?.organizer;
 
   const onChainStatuses: Record<string, number> = {};
   if (fields?.statuses) {
-    const contents: any[] = fields.statuses.fields?.contents ?? [];
-    contents.forEach((entry: any) => { onChainStatuses[entry.fields.key] = parseInt(entry.fields.value); });
+    (fields.statuses.fields?.contents ?? []).forEach((e: any) => {
+      onChainStatuses[e.fields.key] = parseInt(e.fields.value);
+    });
   }
   const resolvedStatuses = Object.keys(statuses).length > 0 ? statuses : onChainStatuses;
   const paidCount = Object.values(resolvedStatuses).filter(s => s > 0).length;
   const totalCount = names?.length ?? Object.keys(resolvedStatuses).length;
   const goalSui = price ? (goalUsdCents / 100 / price) : null;
   const progress = goalSui && poolMist > 0 ? Math.min(100, Math.round((poolMist / 1e9 / goalSui) * 100)) : 0;
-
   const pending = (names ?? []).filter(n => (resolvedStatuses[n] ?? 0) === 0);
 
   async function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
     setUnlockError('');
     try {
-      if (!fields) throw new Error('Event not loaded');
+      if (!fields) throw new Error('not loaded');
       const encHex: number[] = fields.encrypted_participants;
-      const saltBytes = encHex.slice(0, 16);
-      const salt = new TextDecoder().decode(new Uint8Array(saltBytes)).replace(/\0/g, '').replace(/^0+/, '').trim();
-      const encData = new TextDecoder().decode(new Uint8Array(encHex.slice(16)));
-      const decrypted = await decryptNames(encData, password, salt);
+      const salt = new TextDecoder().decode(new Uint8Array(encHex.slice(0, 16))).replace(/\0/g, '').replace(/^0+/, '').trim();
+      const decrypted = await decryptNames(new TextDecoder().decode(new Uint8Array(encHex.slice(16))), password, salt);
       setStatuses(onChainStatuses);
       setNames(decrypted);
-      // Decrypt title
       try {
         const titleHex: number[] = fields.title_encrypted;
-        const titleSaltBytes = titleHex.slice(0, 24);
-        const titleSaltRaw = new TextDecoder().decode(new Uint8Array(titleSaltBytes)).replace(/\0/g, '').replace(/^0+/, '').trim();
-        const titleEncData = new TextDecoder().decode(new Uint8Array(titleHex.slice(24)));
-        const titleArr = await decryptNames(titleEncData, password, titleSaltRaw);
+        const titleSalt = new TextDecoder().decode(new Uint8Array(titleHex.slice(0, 24))).replace(/\0/g, '').replace(/^0+/, '').trim();
+        const titleArr = await decryptNames(new TextDecoder().decode(new Uint8Array(titleHex.slice(24))), password, titleSalt);
         setTitle(titleArr[0] ?? null);
-      } catch { setTitle(null); }
-    } catch { setUnlockError('Wrong password or could not decrypt'); }
+      } catch { /* optional */ }
+    } catch { setUnlockError('Wrong password'); }
   }
 
   async function execTx(tx: any) {
     tx.setSender(account!.address);
     tx.setExpiration({ None: true } as any);
     const bytes = await tx.build({ client });
-    const b64 = btoa(String.fromCharCode(...bytes));
-    await signAndExecute({ transaction: b64 as any });
+    await signAndExecute({ transaction: btoa(String.fromCharCode(...bytes)) as any });
     await refetch();
   }
 
@@ -99,46 +94,74 @@ export default function OrganizerPage() {
     finally { setTxLoading(null); }
   }
 
+  function toggleSelect(name: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  }
+
+  async function handleMarkPaypalBatch() {
+    const names = Array.from(selected);
+    if (names.length === 0) return;
+    setTxLoading('batch');
+    try {
+      await execTx(buildMarkPaypalBatch(id, names));
+      setStatuses(prev => {
+        const next = { ...prev };
+        names.forEach(n => { next[n] = 2; });
+        return next;
+      });
+      setSelected(new Set());
+    } catch (err) { alert(String(err)); }
+    finally { setTxLoading(null); }
+  }
+
   async function handleWithdraw() {
     setTxLoading('withdraw');
-    try {
-      await execTx(buildWithdraw(id));
-      alert('Withdrawn successfully!');
-    } catch (err) { alert(String(err)); }
+    try { await execTx(buildWithdraw(id)); }
+    catch (err) { alert(String(err)); }
     finally { setTxLoading(null); }
   }
 
   async function handleClose() {
-    if (!confirm('Close this event? No more contributions will be accepted.')) return;
+    if (!confirm('Close this event?')) return;
     setTxLoading('close');
-    try {
-      await execTx(buildCloseEvent(id));
-    } catch (err) { alert(String(err)); }
+    try { await execTx(buildCloseEvent(id)); }
+    catch (err) { alert(String(err)); }
     finally { setTxLoading(null); }
   }
 
+  const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
+
   if (!account) return (
-    <div className="max-w-2xl mx-auto px-6 py-24 text-center">
-      <p className="text-gray-600">Connect your wallet to access the organizer dashboard.</p>
+    <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-400">
+      Connect your wallet to access the organizer dashboard.
     </div>
   );
-
-  if (isLoading) return <div className="max-w-2xl mx-auto px-6 py-24 text-center text-gray-400">Loading…</div>;
+  if (isLoading) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">Loading…</div>;
 
   if (!names) return (
-    <div className="max-w-lg mx-auto px-6 py-24">
-      <h1 className="text-2xl font-bold mb-2">Organizer Dashboard</h1>
-      <p className="text-xs font-mono text-gray-400 mb-8 break-all">{id}</p>
-      {!isOrganizer && fields && (
-        <p className="text-red-600 text-sm mb-4">⚠ Your wallet is not the organizer of this event.</p>
+    <div className="max-w-lg mx-auto px-6 py-16">
+      <div className="mb-2 inline-block text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-3 py-1 rounded-full">
+        Organizer Dashboard
+      </div>
+      <h1 className="text-3xl font-bold text-white mt-3 mb-1">Unlock Dashboard</h1>
+      <p className="text-xs font-mono text-gray-500 mb-8 break-all">{id}</p>
+      {fields && !isOrganizer && (
+        <p className="text-yellow-400 text-sm mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
+          ⚠ Your wallet ({account.address.slice(0,8)}…) is not the organizer of this event.
+        </p>
       )}
-      <div className="bg-white border rounded-lg p-6">
-        <form onSubmit={handleUnlock}>
+      <div className="card p-6">
+        <form onSubmit={handleUnlock} className="space-y-3">
           <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm mb-3" placeholder="Event password" />
-          {unlockError && <p className="text-red-600 text-sm mb-3">{unlockError}</p>}
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-            Unlock Dashboard
+            className={inputCls} placeholder="Event password" />
+          {unlockError && <p className="text-red-400 text-sm">{unlockError}</p>}
+          <button type="submit"
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 transition">
+            Unlock
           </button>
         </form>
       </div>
@@ -149,85 +172,97 @@ export default function OrganizerPage() {
     <div className="max-w-2xl mx-auto px-6 py-12">
       <div className="flex items-start justify-between mb-6">
         <div>
-          {title && <h1 className="text-2xl font-bold mb-1">{title}</h1>}
-          <p className="text-xs font-mono text-gray-400 break-all">{id}</p>
-          {!isActive && <span className="inline-block mt-1 text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">Closed</span>}
+          <div className="mb-2 inline-block text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-3 py-1 rounded-full">
+            Organizer Dashboard
+          </div>
+          {title && <h1 className="text-3xl font-bold text-white mt-2 mb-1">{title}</h1>}
+          <p className="text-xs font-mono text-gray-500 break-all">{id}</p>
+          {!isActive && <span className="mt-1 inline-block text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
         </div>
         <div className="flex gap-2 shrink-0 ml-4">
           <button onClick={handleWithdraw} disabled={!!txLoading || poolMist === 0}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+            className="px-4 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium hover:bg-green-500/30 disabled:opacity-40 transition">
             {txLoading === 'withdraw' ? 'Withdrawing…' : `Withdraw ${poolSui} SUI`}
           </button>
           {isActive && (
             <button onClick={handleClose} disabled={!!txLoading}
-              className="border border-red-600 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50">
-              {txLoading === 'close' ? 'Closing…' : 'Close Event'}
+              className="px-4 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-sm font-medium hover:bg-red-500/20 disabled:opacity-40 transition">
+              {txLoading === 'close' ? 'Closing…' : 'Close'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Pool', value: `${poolSui} SUI` },
           { label: 'Tips', value: `${tipSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
-          <div key={s.label} className="bg-white border rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-500">{s.label}</p>
-            <p className="font-semibold text-sm mt-1">{s.value}</p>
+          <div key={s.label} className="card p-3 text-center">
+            <p className="text-xs text-gray-500 mb-1">{s.label}</p>
+            <p className="font-semibold text-sm text-white">{s.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Progress bar */}
-      <div className="bg-white border rounded-lg p-4 mb-6">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-600">SUI collected</span>
-          <span className="font-medium">{progress}%{goalSui ? ` (${poolSui} / ${goalSui.toFixed(2)} SUI)` : ''}</span>
+      <div className="card p-4 mb-6">
+        <div className="flex justify-between text-xs text-gray-400 mb-2">
+          <span>SUI collected</span>
+          <span>{progress}%{goalSui ? ` · ${poolSui} / ${goalSui.toFixed(2)} SUI` : ''}</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+        <div className="w-full bg-white/5 rounded-full h-1.5">
+          <div className="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
       {pending.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-700 text-sm font-medium">Still pending: {pending.join(', ')}</p>
+        <div className="mb-4 px-4 py-3 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-yellow-400 text-sm">
+          Still pending: {pending.join(', ')}
         </div>
       )}
 
-      <div className="bg-white border rounded-lg overflow-hidden">
+      {selected.size > 0 && isOrganizer && isActive && (
+        <div className="mb-3 flex items-center justify-between px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+          <span className="text-sm text-blue-400">{selected.size} selected</span>
+          <button onClick={handleMarkPaypalBatch} disabled={!!txLoading}
+            className="text-xs px-4 py-1.5 rounded-full bg-blue-500 text-white font-medium hover:bg-blue-600 disabled:opacity-40 transition">
+            {txLoading === 'batch' ? 'Marking…' : `Mark ${selected.size} as PayPal ✓`}
+          </button>
+        </div>
+      )}
+
+      <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="border-b border-white/10">
             <tr>
-              <th className="text-left px-4 py-2">Name</th>
-              <th className="text-left px-4 py-2">Status</th>
-              <th className="px-4 py-2" />
+              {isOrganizer && isActive && <th className="px-4 py-3 w-8" />}
+              <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Name</th>
+              <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Status</th>
             </tr>
           </thead>
           <tbody>
             {names.map(name => {
               const status = resolvedStatuses[name] ?? 0;
+              const s = STATUS[status];
+              const isSelected = selected.has(name);
               return (
-                <tr key={name} className={`border-b last:border-0 ${status === 0 ? 'bg-red-50' : ''}`}>
-                  <td className="px-4 py-3 font-medium">{name}</td>
+                <tr key={name}
+                  className={`border-b border-white/5 last:border-0 transition ${status === 0 && isActive && isOrganizer ? 'cursor-pointer hover:bg-white/5' : ''} ${isSelected ? 'bg-blue-500/10' : ''}`}
+                  onClick={() => status === 0 && isActive && isOrganizer && toggleSelect(name)}>
+                  {isOrganizer && isActive && (
+                    <td className="px-4 py-3">
+                      {status === 0 && (
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(name)}
+                          onClick={e => e.stopPropagation()}
+                          className="accent-blue-500 w-4 h-4" />
+                      )}
+                    </td>
+                  )}
+                  <td className="px-4 py-3 font-medium text-white">{name}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[status].color}`}>
-                      {STATUS_LABELS[status].label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {status === 0 && isActive && isOrganizer && (
-                      <button
-                        onClick={() => handleMarkPaypal(name)}
-                        disabled={!!txLoading}
-                        className="text-xs border border-blue-500 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-50 disabled:opacity-50">
-                        {txLoading === name ? 'Marking…' : 'Mark PayPal'}
-                      </button>
-                    )}
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.cls}`}>{s.label}</span>
                   </td>
                 </tr>
               );

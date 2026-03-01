@@ -1,4 +1,4 @@
-module sui_crowdfund::crowdfund {
+module kitty::kitty {
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
@@ -17,7 +17,7 @@ module sui_crowdfund::crowdfund {
     /// The crowdfund event — shared object, accessible to anyone with the ID.
     /// Participant list is AES-256-GCM encrypted client-side; only people
     /// with the password can see who's contributing.
-    public struct CrowdFundEvent has key {
+    public struct KittyEvent has key {
         id: UID,
         organizer: address,
         title_encrypted: vector<u8>,         // encrypted event title
@@ -33,7 +33,7 @@ module sui_crowdfund::crowdfund {
 
     // === Emitted Events (for indexing) ===
 
-    public struct CrowdFundEventCreated has copy, drop {
+    public struct KittyEventCreated has copy, drop {
         event_id: ID,
         organizer: address,
         goal_usd_cents: u64,
@@ -59,7 +59,7 @@ module sui_crowdfund::crowdfund {
             i = i + 1;
         };
 
-        let crowdfund_event = CrowdFundEvent {
+        let crowdfund_event = KittyEvent {
             id: object::new(ctx),
             organizer: ctx.sender(),
             title_encrypted,
@@ -73,7 +73,7 @@ module sui_crowdfund::crowdfund {
             active: true,
         };
 
-        event::emit(CrowdFundEventCreated {
+        event::emit(KittyEventCreated {
             event_id: object::id(&crowdfund_event),
             organizer: ctx.sender(),
             goal_usd_cents,
@@ -85,7 +85,7 @@ module sui_crowdfund::crowdfund {
 
     /// Contribute SUI to an event.
     public entry fun contribute_sui(
-        crowdfund_event: &mut CrowdFundEvent,
+        crowdfund_event: &mut KittyEvent,
         name: String,
         payment: Coin<SUI>,
         _ctx: &mut TxContext,
@@ -99,7 +99,7 @@ module sui_crowdfund::crowdfund {
 
     /// Contribute SUI + optional tip to cover organizer gas fees.
     public entry fun contribute_sui_with_tip(
-        crowdfund_event: &mut CrowdFundEvent,
+        crowdfund_event: &mut KittyEvent,
         name: String,
         payment: Coin<SUI>,
         tip_coin: Coin<SUI>,
@@ -115,7 +115,7 @@ module sui_crowdfund::crowdfund {
 
     /// Organizer marks a participant as paid via Paypal.
     public entry fun mark_paypal(
-        crowdfund_event: &mut CrowdFundEvent,
+        crowdfund_event: &mut KittyEvent,
         name: String,
         ctx: &mut TxContext,
     ) {
@@ -128,7 +128,7 @@ module sui_crowdfund::crowdfund {
 
     /// Organizer withdraws pool + tips.
     public entry fun organizer_withdraw(
-        crowdfund_event: &mut CrowdFundEvent,
+        crowdfund_event: &mut KittyEvent,
         ctx: &mut TxContext,
     ) {
         assert!(crowdfund_event.organizer == ctx.sender(), ENotOrganizer);
@@ -144,9 +144,28 @@ module sui_crowdfund::crowdfund {
         };
     }
 
+
+    /// Organizer marks multiple participants as paid via Paypal in one tx.
+    public entry fun mark_paypal_batch(
+        crowdfund_event: &mut KittyEvent,
+        names: vector<String>,
+        ctx: &mut TxContext,
+    ) {
+        assert!(crowdfund_event.organizer == ctx.sender(), ENotOrganizer);
+        assert!(crowdfund_event.active, EEventClosed);
+        let mut i = 0;
+        while (i < names.length()) {
+            let name = names[i];
+            if (crowdfund_event.statuses.contains(&name) && *crowdfund_event.statuses.get(&name) == 0) {
+                *crowdfund_event.statuses.get_mut(&name) = 2u8;
+            };
+            i = i + 1;
+        };
+    }
+
     /// Organizer closes the event — no more contributions accepted.
     public entry fun close_event(
-        crowdfund_event: &mut CrowdFundEvent,
+        crowdfund_event: &mut KittyEvent,
         ctx: &mut TxContext,
     ) {
         assert!(crowdfund_event.organizer == ctx.sender(), ENotOrganizer);
