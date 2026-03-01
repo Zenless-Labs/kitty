@@ -1,21 +1,19 @@
-import type { Metadata } from 'next';
+'use client';
+
 import './globals.css';
 import '@mysten/dapp-kit/dist/index.css';
-import Providers from './providers';
+import Providers, { type Network } from './providers';
 import Header from './header';
-
-export const metadata: Metadata = {
-  title: 'Kitty',
-  description: 'Chip in together. Privately. On Sui.',
-};
+import { useState } from 'react';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const [network, setNetwork] = useState<Network>('testnet');
   return (
     <html lang="en" className="dark">
       <body>
-        <Providers>
+        <Providers network={network} onNetworkChange={setNetwork}>
           <div className="relative z-10">
-            <Header />
+            <Header network={network} onNetworkChange={setNetwork} />
             <main>{children}</main>
           </div>
         </Providers>
