@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { PACKAGE_ID } from '@/lib/contract';
@@ -18,6 +18,11 @@ export default function Home() {
   const [events, setEvents] = useState<KittyEvent[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [eventId, setEventId] = useState('');
+
+  useEffect(() => {
+    if (account) loadMyEvents();
+    else setEvents(null);
+  }, [account?.address]);
 
   async function loadMyEvents() {
     if (!account) return;
@@ -80,13 +85,13 @@ export default function Home() {
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium text-gray-300">My Events</p>
-            <button onClick={loadMyEvents} disabled={loading}
+<button onClick={loadMyEvents} disabled={loading}
               className="text-xs text-blue-400 hover:text-blue-300 transition disabled:opacity-40">
-              {loading ? 'Loading…' : events === null ? 'Load' : 'Refresh'}
+              {loading ? 'Loading…' : '↻ Refresh'}
             </button>
           </div>
-          {events === null && (
-            <p className="text-xs text-gray-600 text-center py-4">Click Load to fetch your events</p>
+          {events === null && loading && (
+            <p className="text-xs text-gray-600 text-center py-4">Loading…</p>
           )}
           {events?.length === 0 && (
             <p className="text-xs text-gray-600 text-center py-4">No events found for this wallet</p>

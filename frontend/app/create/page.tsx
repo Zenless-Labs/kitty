@@ -5,6 +5,13 @@ import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClient } from '@
 import { encryptNames, hashPassword } from '@/lib/crypto';
 import { buildCreateEvent } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
+import { savePassword } from '@/lib/kitty';
+
+function generatePassword(len = 10): string {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789'; // URL-friendly, no ambiguous chars
+  const bytes = crypto.getRandomValues(new Uint8Array(len));
+  return Array.from(bytes).map(b => chars[b % chars.length]).join('');
+}
 
 export default function CreatePage() {
   const account = useCurrentAccount();
@@ -17,13 +24,13 @@ export default function CreatePage() {
 
   const [title, setTitle] = useState('');
   const [names, setNames] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [password, setPassword] = useState(() => generatePassword());
   const [goalUsd, setGoalUsd] = useState('');
   const [deadline, setDeadline] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [eventId, setEventId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const nameList = names.split('\n').map(n => n.trim()).filter(Boolean);
   const numParticipants = nameList.length;
@@ -31,11 +38,18 @@ export default function CreatePage() {
   const perPersonUsd = numParticipants > 0 ? goalNum / numParticipants : 0;
   const perPersonSui = usdToSui(perPersonUsd);
 
+  const shareUrl = eventId
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}?pw=${encodeURIComponent(password)}`
+    : '';
+  const organizerUrl = eventId
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}/organizer?pw=${encodeURIComponent(password)}`
+    : '';
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
     if (nameList.length === 0) { setError('Add at least one participant'); return; }
+    if (!password) { setError('Password required'); return; }
 
     setLoading(true);
     try {
@@ -46,7 +60,6 @@ export default function CreatePage() {
 
       const saltBytes = Array.from(new TextEncoder().encode(salt.padStart(16, '0')));
       const encBytes = [...saltBytes, ...Array.from(new TextEncoder().encode(encrypted))];
-
       const titleSaltBytes = Array.from(new TextEncoder().encode((salt + '_title').padStart(24, '0')));
       const titleEncBytes = [...titleSaltBytes, ...Array.from(new TextEncoder().encode(titleEncrypted))];
 
@@ -65,14 +78,15 @@ export default function CreatePage() {
       tx.setSender(account!.address);
       tx.setExpiration({ None: true } as any);
       const bytes = await tx.build({ client });
-      const b64 = btoa(String.fromCharCode(...bytes));
+      const res = await signAndExecute({ transaction: btoa(String.fromCharCode(...bytes)) as any });
 
-      const res = await signAndExecute({ transaction: b64 as any });
       const created: any[] = (res as any).effects?.created ?? [];
       const eventObj = created.find((o: any) => o.owner?.Shared !== undefined || o.owner === 'Shared');
-      const eventId = eventObj?.reference?.objectId ?? null;
-      const digest = (res as any).digest ?? (res as any).effects?.transactionDigest ?? '';
-      setResult(eventId ? `event:${eventId}` : `digest:${digest}`);
+      const eid = eventObj?.reference?.objectId ?? null;
+      if (eid) {
+        setEventId(eid);
+        savePassword(eid, password);
+      }
     } catch (err) {
       setError(String(err));
     } finally {
@@ -80,14 +94,86 @@ export default function CreatePage() {
     }
   }
 
+  async function copyToClipboard(text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   if (!account) return (
     <div className="max-w-lg mx-auto px-6 py-32 text-center">
-      <p className="text-gray-400 mb-4">Connect your wallet to create an event.</p>
+      <p className="text-gray-400">Connect your wallet to create an event.</p>
     </div>
   );
 
   const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
   const labelCls = "block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider";
+
+  // Show share UI after creation
+  if (eventId) return (
+    <div className="max-w-lg mx-auto px-6 py-12">
+      <div className="text-center mb-8">
+        <div className="text-4xl mb-3">🎉</div>
+        <h1 className="text-3xl font-bold text-white mb-2">Event Created!</h1>
+        <p className="text-gray-400 text-sm">Share the link below with your participants</p>
+      </div>
+
+      <div className="space-y-4">
+        {/* Participant link */}
+        <div className="card p-4">
+          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Participant Link</p>
+          <p className="text-xs text-gray-500 mb-3">Send this to everyone — opens with password pre-filled</p>
+          <div className="flex gap-2">
+            <input readOnly value={shareUrl}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none" />
+            <button onClick={() => copyToClipboard(shareUrl)}
+              className="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 text-sm hover:bg-blue-500/30 transition whitespace-nowrap">
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        {/* Organizer dashboard link */}
+        <div className="card p-4">
+          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Your Dashboard</p>
+          <p className="text-xs text-gray-500 mb-3">Bookmark this — your organizer view</p>
+          <div className="flex gap-2">
+            <input readOnly value={organizerUrl}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none" />
+            <button onClick={() => copyToClipboard(organizerUrl)}
+              className="px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/30 text-sm hover:bg-violet-500/30 transition whitespace-nowrap">
+              Copy
+            </button>
+          </div>
+        </div>
+
+        {/* Slack/IM ready message */}
+        <div className="card p-4">
+          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Ready to paste in Slack / Telegram</p>
+          <div className="flex gap-2">
+            <textarea readOnly rows={4}
+              value={`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\nPassword is in the link — just click and pay!`}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none resize-none" />
+            <button onClick={() => copyToClipboard(`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\nPassword is in the link — just click and pay!`)}
+              className="px-4 py-2 rounded-xl bg-white/10 text-gray-300 border border-white/10 text-sm hover:bg-white/15 transition self-start whitespace-nowrap">
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <a href={`/event/${eventId}/organizer`}
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white text-center font-semibold hover:opacity-90 transition">
+            Open Dashboard →
+          </a>
+          <button onClick={() => { setEventId(null); setTitle(''); setNames(''); setPassword(generatePassword()); setGoalUsd(''); setDeadline(''); }}
+            className="px-6 py-3 rounded-xl border border-white/10 text-gray-300 font-medium hover:border-white/30 transition">
+            New Event
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-lg mx-auto px-6 py-12">
@@ -108,15 +194,17 @@ export default function CreatePage() {
             className={inputCls} placeholder={"Alice\nBob\nCharlie"} required />
           {numParticipants > 0 && <p className="text-xs text-gray-500 mt-1">{numParticipants} participant{numParticipants > 1 ? 's' : ''}</p>}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className={inputCls} required />
+        <div>
+          <label className={labelCls}>Password</label>
+          <div className="flex gap-2">
+            <input type="text" value={password} onChange={e => setPassword(e.target.value)}
+              className={inputCls} required />
+            <button type="button" onClick={() => setPassword(generatePassword())}
+              className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm hover:bg-white/10 transition whitespace-nowrap">
+              ↻ New
+            </button>
           </div>
-          <div>
-            <label className={labelCls}>Confirm Password</label>
-            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputCls} required />
-          </div>
+          <p className="text-xs text-gray-600 mt-1">Auto-generated · URL-safe · 10 chars. Edit if you prefer your own.</p>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -147,17 +235,6 @@ export default function CreatePage() {
         )}
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
-
-        {result && result.startsWith('event:') && (
-          <div className="card p-4 border-green-500/20 bg-green-500/5">
-            <p className="text-green-400 text-sm font-semibold mb-2">✓ Event created!</p>
-            <p className="text-gray-400 text-xs font-mono break-all mb-3">{result.slice(6)}</p>
-            <a href={`/event/${result.slice(6)}`}
-              className="inline-block text-sm text-blue-400 hover:text-blue-300 transition">
-              View event →
-            </a>
-          </div>
-        )}
 
         <button type="submit" disabled={loading}
           className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 disabled:opacity-40 transition shadow-lg shadow-blue-500/20">
