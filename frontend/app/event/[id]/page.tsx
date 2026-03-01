@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
 import { buildContributeSui, buildContributeSuiWithTip } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
@@ -16,7 +16,6 @@ const STATUS = {
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { price, usdToSui } = useSuiPrice();
@@ -25,7 +24,7 @@ export default function EventPage() {
       client.executeTransactionBlock({ transactionBlock: bytes, signature, options: { showEffects: true } }),
   });
 
-  const [password, setPassword] = useState(() => searchParams.get('pw') ?? '');
+  const [password, setPassword] = useState('');
   const [names, setNames] = useState<string[] | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, number>>({});
@@ -50,7 +49,7 @@ export default function EventPage() {
   // Auto-decrypt from URL param or localStorage on load
   useEffect(() => {
     if (!fields || names !== null) return;
-    const pw = searchParams.get('pw') ?? loadPassword(id);
+    const pw = loadPassword(id);
     if (!pw) return;
     setPassword(pw);
     decryptEvent(fields, pw).then(({ names: n, title: t }) => {

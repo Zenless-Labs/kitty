@@ -39,10 +39,10 @@ export default function CreatePage() {
   const perPersonSui = usdToSui(perPersonUsd);
 
   const shareUrl = eventId
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}?pw=${encodeURIComponent(password)}`
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}`
     : '';
   const organizerUrl = eventId
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}/organizer?pw=${encodeURIComponent(password)}`
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}/organizer`
     : '';
 
   async function handleSubmit(e: React.FormEvent) {
@@ -122,7 +122,7 @@ export default function CreatePage() {
         {/* Participant link */}
         <div className="card p-4">
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Participant Link</p>
-          <p className="text-xs text-gray-500 mb-3">Send this to everyone — opens with password pre-filled</p>
+          <p className="text-xs text-gray-500 mb-3">Send this to everyone — they'll need the password to unlock</p>
           <div className="flex gap-2">
             <input readOnly value={shareUrl}
               className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none" />
@@ -152,9 +152,9 @@ export default function CreatePage() {
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Ready to paste in Slack / Telegram</p>
           <div className="flex gap-2">
             <textarea readOnly rows={4}
-              value={`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\nPassword is in the link — just click and pay!`}
+              value={`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\n🔑 Password: ${password}`}
               className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none resize-none" />
-            <button onClick={() => copyToClipboard(`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\nPassword is in the link — just click and pay!`)}
+            <button onClick={() => copyToClipboard(`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\n🔑 Password: ${password}`)}
               className="px-4 py-2 rounded-xl bg-white/10 text-gray-300 border border-white/10 text-sm hover:bg-white/15 transition self-start whitespace-nowrap">
               Copy
             </button>

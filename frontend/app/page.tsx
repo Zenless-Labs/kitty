@@ -9,6 +9,7 @@ interface KittyEvent {
   event_id: string;
   goal_usd_cents: number;
   deadline: number;
+  createdAt: number;
   txDigest: string;
 }
 
@@ -38,6 +39,7 @@ export default function Home() {
           event_id: e.parsedJson.event_id,
           goal_usd_cents: parseInt(e.parsedJson.goal_usd_cents),
           deadline: parseInt(e.parsedJson.deadline),
+          createdAt: parseInt(e.timestampMs ?? '0'),
           txDigest: e.id?.txDigest ?? '',
         }));
       setEvents(mine);
@@ -105,9 +107,10 @@ export default function Home() {
                     <p className="text-xs font-mono text-gray-400 group-hover:text-gray-300 transition">
                       {ev.event_id.slice(0, 10)}…{ev.event_id.slice(-6)}
                     </p>
-                    {ev.deadline > 0 && (
-                      <p className="text-xs text-gray-600 mt-0.5">{new Date(ev.deadline).toLocaleDateString()}</p>
-                    )}
+                    <p className="text-xs text-gray-600 mt-0.5">
+                        Created {new Date(ev.createdAt).toLocaleDateString()}
+                        {ev.deadline > 0 && ` · Due ${new Date(ev.deadline).toLocaleDateString()}`}
+                      </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-white">${(ev.goal_usd_cents / 100).toFixed(2)}</p>
