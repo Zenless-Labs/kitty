@@ -12,10 +12,10 @@ export default function Header({ network, onNetworkChange }: {
         🐱 Kitty
       </a>
       <div className="flex items-center gap-3">
-        <div className="flex text-xs rounded-lg overflow-hidden border border-white/10">
+        <div className="flex text-sm rounded-lg overflow-hidden border border-white/10">
           {(['testnet', 'mainnet'] as Network[]).map(n => (
             <button key={n} onClick={() => onNetworkChange(n)}
-              className={`px-3 py-1.5 font-medium transition capitalize ${
+              className={`px-3 py-2 font-medium transition capitalize ${
                 network === n
                   ? n === 'mainnet'
                     ? 'bg-green-500/20 text-green-400'
