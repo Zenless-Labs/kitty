@@ -108,8 +108,8 @@ export default function Home() {
                       {ev.event_id.slice(0, 10)}…{ev.event_id.slice(-6)}
                     </p>
                     <p className="text-xs text-gray-600 mt-0.5">
-                        Created {new Date(ev.createdAt).toLocaleDateString()}
-                        {ev.deadline > 0 && ` · Due ${new Date(ev.deadline).toLocaleDateString()}`}
+                        Created {new Date(ev.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
+                        {ev.deadline > 0 && ` · Due ${new Date(ev.deadline).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`}
                       </p>
                   </div>
                   <div className="text-right">
