@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
 import { buildWithdraw, buildCloseEvent, buildMarkPaypal, buildMarkPaypalBatch } from '@/lib/contract';
-import { decryptNames } from '@/lib/crypto';
+import { decryptEvent, parseStatuses, savePassword, loadPassword } from '@/lib/kitty';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 
 const STATUS = {
@@ -15,6 +15,8 @@ const STATUS = {
 
 export default function OrganizerPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { price } = useSuiPrice();
@@ -23,7 +25,8 @@ export default function OrganizerPage() {
       client.executeTransactionBlock({ transactionBlock: bytes, signature, options: { showEffects: true } }),
   });
 
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => searchParams.get('pw') ?? '');
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [names, setNames] = useState<string[] | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, number>>({});
@@ -45,12 +48,7 @@ export default function OrganizerPage() {
   const isActive: boolean = fields?.active ?? true;
   const isOrganizer = account?.address === fields?.organizer;
 
-  const onChainStatuses: Record<string, number> = {};
-  if (fields?.statuses) {
-    (fields.statuses.fields?.contents ?? []).forEach((e: any) => {
-      onChainStatuses[e.fields.key] = parseInt(e.fields.value);
-    });
-  }
+  const onChainStatuses = parseStatuses(fields);
   const resolvedStatuses = Object.keys(statuses).length > 0 ? statuses : onChainStatuses;
   const paidCount = Object.values(resolvedStatuses).filter(s => s > 0).length;
   const totalCount = names?.length ?? Object.keys(resolvedStatuses).length;
@@ -58,22 +56,38 @@ export default function OrganizerPage() {
   const progress = goalSui && poolMist > 0 ? Math.min(100, Math.round((poolMist / 1e9 / goalSui) * 100)) : 0;
   const pending = (names ?? []).filter(n => (resolvedStatuses[n] ?? 0) === 0);
 
-  async function handleUnlock(e: React.FormEvent) {
+  // Auto-decrypt from URL param or localStorage
+  useEffect(() => {
+    if (!fields || names !== null) return;
+    const pw = searchParams.get('pw') ?? loadPassword(id as string);
+    if (!pw) return;
+    setPassword(pw);
+    decryptEvent(fields, pw).then(({ names: n, title: t }) => {
+      setNames(n); setTitle(t); setStatuses(parseStatuses(fields));
+    }).catch(() => {});
+  }, [fields]);
+
+  // 3s redirect countdown if not organizer
+  useEffect(() => {
+    if (!fields || !account || isOrganizer) return;
+    setCountdown(3);
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === 1) { clearInterval(interval); router.replace(`/event/${id}`); return 0; }
+        return (prev ?? 3) - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [fields, account, isOrganizer]);
+
+  async function handleDecrypt(e: React.FormEvent) {
     e.preventDefault();
     setUnlockError('');
     try {
-      if (!fields) throw new Error('not loaded');
-      const encHex: number[] = fields.encrypted_participants;
-      const salt = new TextDecoder().decode(new Uint8Array(encHex.slice(0, 16))).replace(/\0/g, '').replace(/^0+/, '').trim();
-      const decrypted = await decryptNames(new TextDecoder().decode(new Uint8Array(encHex.slice(16))), password, salt);
-      setStatuses(onChainStatuses);
-      setNames(decrypted);
-      try {
-        const titleHex: number[] = fields.title_encrypted;
-        const titleSalt = new TextDecoder().decode(new Uint8Array(titleHex.slice(0, 24))).replace(/\0/g, '').replace(/^0+/, '').trim();
-        const titleArr = await decryptNames(new TextDecoder().decode(new Uint8Array(titleHex.slice(24))), password, titleSalt);
-        setTitle(titleArr[0] ?? null);
-      } catch { /* optional */ }
+      const { names: n, title: t } = await decryptEvent(fields, password);
+      setNames(n); setTitle(t);
+      setStatuses(parseStatuses(fields));
+      savePassword(id as string, password);
     } catch { setUnlockError('Wrong password'); }
   }
 
@@ -85,34 +99,16 @@ export default function OrganizerPage() {
     await refetch();
   }
 
-  async function handleMarkPaypal(name: string) {
-    setTxLoading(name);
-    try {
-      await execTx(buildMarkPaypal(id, name));
-      setStatuses(prev => ({ ...prev, [name]: 2 }));
-    } catch (err) { alert(String(err)); }
-    finally { setTxLoading(null); }
-  }
-
   function toggleSelect(name: string) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
+    setSelected(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
   }
 
   async function handleMarkPaypalBatch() {
-    const names = Array.from(selected);
-    if (names.length === 0) return;
+    const ns = Array.from(selected);
     setTxLoading('batch');
     try {
-      await execTx(buildMarkPaypalBatch(id, names));
-      setStatuses(prev => {
-        const next = { ...prev };
-        names.forEach(n => { next[n] = 2; });
-        return next;
-      });
+      await execTx(buildMarkPaypalBatch(id, ns));
+      setStatuses(prev => { const n = {...prev}; ns.forEach(x => { n[x] = 2; }); return n; });
       setSelected(new Set());
     } catch (err) { alert(String(err)); }
     finally { setTxLoading(null); }
@@ -136,40 +132,25 @@ export default function OrganizerPage() {
   const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
 
   if (!account) return (
-    <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-400">
-      Connect your wallet to access the organizer dashboard.
-    </div>
+    <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-400">Connect your wallet to access the organizer dashboard.</div>
   );
   if (isLoading) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">Loading…</div>;
-
-  if (!names) return (
-    <div className="max-w-lg mx-auto px-6 py-16">
-      <div className="mb-2 inline-block text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-3 py-1 rounded-full">
-        Organizer Dashboard
-      </div>
-      <h1 className="text-3xl font-bold text-white mt-3 mb-1">Unlock Dashboard</h1>
-      <p className="text-xs font-mono text-gray-500 mb-8 break-all">{id}</p>
-      {fields && !isOrganizer && (
-        <p className="text-yellow-400 text-sm mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
-          ⚠ Your wallet ({account.address.slice(0,8)}…) is not the organizer of this event.
-        </p>
+  if (!fields) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-red-400">Event not found</div>;
+  if (fields && account && !isOrganizer) return (
+    <div className="max-w-lg mx-auto px-6 py-32 text-center">
+      <p className="text-4xl mb-4">🔒</p>
+      <p className="text-white font-semibold mb-2">Not authorized</p>
+      <p className="text-gray-500 text-sm">Your wallet is not the organizer of this event.</p>
+      <p className="text-gray-600 text-xs font-mono mt-4 break-all">{account.address}</p>
+      {countdown !== null && (
+        <p className="text-gray-500 text-sm mt-6">Redirecting to event page in <span className="text-white font-bold">{countdown}</span>s…</p>
       )}
-      <div className="card p-6">
-        <form onSubmit={handleUnlock} className="space-y-3">
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            className={inputCls} placeholder="Event password" />
-          {unlockError && <p className="text-red-400 text-sm">{unlockError}</p>}
-          <button type="submit"
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 transition">
-            Unlock
-          </button>
-        </form>
-      </div>
     </div>
   );
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
+      {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="mb-2 inline-block text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-3 py-1 rounded-full">
@@ -193,6 +174,7 @@ export default function OrganizerPage() {
         </div>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
@@ -207,6 +189,7 @@ export default function OrganizerPage() {
         ))}
       </div>
 
+      {/* Progress */}
       <div className="card p-4 mb-6">
         <div className="flex justify-between text-xs text-gray-400 mb-2">
           <span>SUI collected</span>
@@ -217,59 +200,73 @@ export default function OrganizerPage() {
         </div>
       </div>
 
-      {pending.length > 0 && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-yellow-400 text-sm">
-          Still pending: {pending.join(', ')}
+      {/* Participants — decrypt inline */}
+      {!names ? (
+        <div className="card p-5">
+          <p className="text-sm text-gray-300 font-medium mb-1">Participant list is encrypted</p>
+          <p className="text-xs text-gray-500 mb-4">Enter the event password to decrypt and manage participants.</p>
+          <form onSubmit={handleDecrypt} className="flex gap-3">
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              className={inputCls} placeholder="Event password" />
+            <button type="submit"
+              className="px-5 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white text-sm font-semibold hover:opacity-90 transition whitespace-nowrap">
+              Decrypt
+            </button>
+          </form>
+          {unlockError && <p className="text-red-400 text-sm mt-2">{unlockError}</p>}
         </div>
-      )}
-
-      {selected.size > 0 && isOrganizer && isActive && (
-        <div className="mb-3 flex items-center justify-between px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-          <span className="text-sm text-blue-400">{selected.size} selected</span>
-          <button onClick={handleMarkPaypalBatch} disabled={!!txLoading}
-            className="text-xs px-4 py-1.5 rounded-full bg-blue-500 text-white font-medium hover:bg-blue-600 disabled:opacity-40 transition">
-            {txLoading === 'batch' ? 'Marking…' : `Mark ${selected.size} as PayPal ✓`}
-          </button>
-        </div>
-      )}
-
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b border-white/10">
-            <tr>
-              {isOrganizer && isActive && <th className="px-4 py-3 w-8" />}
-              <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Name</th>
-              <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {names.map(name => {
-              const status = resolvedStatuses[name] ?? 0;
-              const s = STATUS[status];
-              const isSelected = selected.has(name);
-              return (
-                <tr key={name}
-                  className={`border-b border-white/5 last:border-0 transition ${status === 0 && isActive && isOrganizer ? 'cursor-pointer hover:bg-white/5' : ''} ${isSelected ? 'bg-blue-500/10' : ''}`}
-                  onClick={() => status === 0 && isActive && isOrganizer && toggleSelect(name)}>
-                  {isOrganizer && isActive && (
-                    <td className="px-4 py-3">
-                      {status === 0 && (
-                        <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(name)}
-                          onClick={e => e.stopPropagation()}
-                          className="accent-blue-500 w-4 h-4" />
-                      )}
-                    </td>
-                  )}
-                  <td className="px-4 py-3 font-medium text-white">{name}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.cls}`}>{s.label}</span>
-                  </td>
+      ) : (
+        <>
+          {pending.length > 0 && (
+            <div className="mb-3 px-4 py-3 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-yellow-400 text-sm">
+              Still pending: {pending.join(', ')}
+            </div>
+          )}
+          {selected.size > 0 && (
+            <div className="mb-3 flex items-center justify-between px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <span className="text-sm text-blue-400">{selected.size} selected</span>
+              <button onClick={handleMarkPaypalBatch} disabled={!!txLoading}
+                className="text-xs px-4 py-1.5 rounded-full bg-blue-500 text-white font-medium hover:bg-blue-600 disabled:opacity-40 transition">
+                {txLoading === 'batch' ? 'Marking…' : `Mark ${selected.size} as PayPal ✓`}
+              </button>
+            </div>
+          )}
+          <div className="card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-white/10">
+                <tr>
+                  <th className="px-4 py-3 w-8" />
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Name</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-wider">Status</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {names.map(name => {
+                  const status = resolvedStatuses[name] ?? 0;
+                  const s = STATUS[status];
+                  const isSelected = selected.has(name);
+                  return (
+                    <tr key={name}
+                      className={`border-b border-white/5 last:border-0 transition ${status === 0 && isActive ? 'cursor-pointer hover:bg-white/5' : ''} ${isSelected ? 'bg-blue-500/10' : ''}`}
+                      onClick={() => status === 0 && isActive && toggleSelect(name)}>
+                      <td className="px-4 py-3">
+                        {status === 0 && isActive && (
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(name)}
+                            onClick={e => e.stopPropagation()} className="accent-blue-500 w-4 h-4" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-white">{name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.cls}`}>{s.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -142,6 +142,16 @@ module kitty::kitty {
             let tip_coin = coin::from_balance(crowdfund_event.tip.split(tip_amount), ctx);
             transfer::public_transfer(tip_coin, ctx.sender());
         };
+        // Auto-close if all participants have contributed
+        let n = crowdfund_event.statuses.size();
+        let mut all_paid = true;
+        let mut idx = 0;
+        while (idx < n) {
+            let (_, v) = crowdfund_event.statuses.get_entry_by_idx(idx);
+            if (*v == 0u8) { all_paid = false; break };
+            idx = idx + 1;
+        };
+        if (all_paid) { crowdfund_event.active = false; };
     }
 
 

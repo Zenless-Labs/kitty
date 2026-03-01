@@ -1,21 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
-import { decryptNames } from '@/lib/crypto';
 import { buildContributeSui, buildContributeSuiWithTip } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
+import { decryptEvent, parseStatuses, savePassword, loadPassword } from '@/lib/kitty';
 
 const STATUS = {
   0: { label: 'Pending', cls: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
-  1: { label: 'SUI ✓',   cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
-  2: { label: 'PayPal ✓',cls: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  1: { label: 'SUI ✓',  cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+  2: { label: 'PayPal ✓',cls:'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
 } as Record<number, {label:string;cls:string}>;
 
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { price, usdToSui } = useSuiPrice();
@@ -24,7 +25,7 @@ export default function EventPage() {
       client.executeTransactionBlock({ transactionBlock: bytes, signature, options: { showEffects: true } }),
   });
 
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => searchParams.get('pw') ?? '');
   const [names, setNames] = useState<string[] | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, number>>({});
@@ -39,19 +40,33 @@ export default function EventPage() {
   });
 
   const fields = (objData?.data?.content as any)?.fields ?? null;
+  const isOrganizer = account?.address === fields?.organizer;
+
+  // Auto-redirect organizer to dashboard
+  useEffect(() => {
+    if (fields && isOrganizer) router.replace(`/event/${id}/organizer`);
+  }, [fields, isOrganizer]);
+
+  // Auto-decrypt from URL param or localStorage on load
+  useEffect(() => {
+    if (!fields || names !== null) return;
+    const pw = searchParams.get('pw') ?? loadPassword(id);
+    if (!pw) return;
+    setPassword(pw);
+    decryptEvent(fields, pw).then(({ names: n, title: t }) => {
+      setNames(n);
+      setTitle(t);
+      setStatuses(parseStatuses(fields));
+    }).catch(() => {});
+  }, [fields]);
+
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
-  const poolSui = (poolMist / 1_000_000_000).toFixed(3);
+  const poolSui = (poolMist / 1e9).toFixed(3);
   const isActive: boolean = fields?.active ?? true;
   const deadline: number = fields ? parseInt(fields.deadline) : 0;
-  const isOrganizer = account?.address === fields?.organizer;
-
-  const onChainStatuses: Record<string, number> = {};
-  if (fields?.statuses) {
-    const contents: any[] = fields.statuses.fields?.contents ?? [];
-    contents.forEach((e: any) => { onChainStatuses[e.fields.key] = parseInt(e.fields.value); });
-  }
+  const onChainStatuses = parseStatuses(fields);
   const resolvedStatuses = Object.keys(statuses).length > 0 ? statuses : onChainStatuses;
   const paidCount = Object.values(resolvedStatuses).filter(s => s > 0).length;
   const totalCount = names?.length ?? Object.keys(resolvedStatuses).length;
@@ -62,22 +77,10 @@ export default function EventPage() {
     e.preventDefault();
     setUnlockError('');
     try {
-      if (!fields) throw new Error('not loaded');
-      const encHex: number[] = fields.encrypted_participants;
-      const salt = new TextDecoder().decode(new Uint8Array(encHex.slice(0, 16))).replace(/\0/g, '').replace(/^0+/, '').trim();
-      const encData = new TextDecoder().decode(new Uint8Array(encHex.slice(16)));
-      const decrypted = await decryptNames(encData, password, salt);
-      setStatuses(onChainStatuses);
-      setNames(decrypted);
-      try {
-        const titleHex: number[] = fields.title_encrypted;
-        const titleSalt = new TextDecoder().decode(new Uint8Array(titleHex.slice(0, 24))).replace(/\0/g, '').replace(/^0+/, '').trim();
-        const titleArr = await decryptNames(new TextDecoder().decode(new Uint8Array(titleHex.slice(24))), password, titleSalt);
-        setTitle(titleArr[0] ?? null);
-      } catch { /* title optional */ }
-
-      // If organizer, redirect to dashboard after unlock
-      if (isOrganizer) router.push(`/event/${id}/organizer`);
+      const { names: n, title: t } = await decryptEvent(fields, password);
+      setNames(n); setTitle(t);
+      setStatuses(parseStatuses(fields));
+      savePassword(id, password);
     } catch { setUnlockError('Wrong password'); }
   }
 
@@ -107,7 +110,11 @@ export default function EventPage() {
 
   const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
 
-  if (isLoading) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">Loading…</div>;
+  if (isLoading || (fields && isOrganizer)) return (
+    <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">
+      {isOrganizer ? 'Redirecting to dashboard…' : 'Loading…'}
+    </div>
+  );
   if (!fields) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-red-400">Event not found</div>;
 
   return (
@@ -117,11 +124,6 @@ export default function EventPage() {
         : <h1 className="text-3xl font-bold mb-1 text-gray-200">Event</h1>}
       <p className="text-xs font-mono text-gray-500 mb-2 break-all">{id}</p>
       {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
-      {isOrganizer && names === null && (
-        <div className="mt-3 mb-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 inline-block">
-          🔑 You are the organizer — unlock to go to your dashboard
-        </div>
-      )}
 
       <div className="grid grid-cols-4 gap-3 my-6">
         {[
@@ -184,28 +186,24 @@ export default function EventPage() {
             <div className="card p-5">
               <h2 className="font-semibold text-white mb-1">Contributing as <span className="text-blue-400">{selectedName}</span></h2>
               {perPersonSui && price && (
-                <p className="text-sm text-gray-500 mb-4">
-                  Suggested {perPersonSui.toFixed(3)} SUI ≈ ${perPersonUsd.toFixed(2)} · SUI ${price.toFixed(3)}
-                </p>
+                <p className="text-sm text-gray-500 mb-4">Suggested {perPersonSui.toFixed(3)} SUI ≈ ${perPersonUsd.toFixed(2)} · SUI ${price.toFixed(3)}</p>
               )}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block">Amount (SUI)</label>
-                  <input type="number" step="0.001" min="0" value={amountSui}
-                    onChange={e => setAmountSui(e.target.value)} className={inputCls}
-                    placeholder={perPersonSui?.toFixed(3) ?? '0'} />
+                  <input type="number" step="0.001" min="0" value={amountSui} onChange={e => setAmountSui(e.target.value)}
+                    className={inputCls} placeholder={perPersonSui?.toFixed(3) ?? '0'} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block">Tip for organizer</label>
-                  <input type="number" step="0.01" min="0" value={tipSui}
-                    onChange={e => setTipSui(e.target.value)} className={inputCls} />
+                  <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)} className={inputCls} />
                 </div>
               </div>
+              {!account && <p className="text-sm text-gray-500 mb-3 text-center">Connect wallet to pay with SUI</p>}
               <button onClick={handleContribute} disabled={txLoading || !account}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 disabled:opacity-40 transition">
                 {txLoading ? 'Sending…' : 'Pay with SUI'}
               </button>
-              {!account && <p className="text-sm text-gray-500 mt-2 text-center">Connect wallet to pay with SUI</p>}
             </div>
           )}
         </div>
