@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
-import { buildContributeSui, buildContributeSuiWithTip } from '@/lib/contract';
+import { buildContributeSui, buildContributeSuiWithTip, buildContributeUsdc, USDC_TYPE } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 import { decryptEvent, parseStatuses, savePassword, loadPassword } from '@/lib/kitty';
 
 const STATUS = {
-  0: { label: 'Pending', cls: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
-  1: { label: 'SUI ✓',  cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
-  2: { label: 'PayPal ✓',cls:'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  0: { label: 'Pending',   cls: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
+  1: { label: 'SUI ✓',    cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+  2: { label: 'PayPal ✓', cls: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  3: { label: 'USDC ✓',   cls: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' },
 } as Record<number, {label:string;cls:string}>;
 
 export default function EventPage() {
@@ -33,6 +34,7 @@ export default function EventPage() {
   const [amountSui, setAmountSui] = useState('');
   const [tipSui, setTipSui] = useState('0.01');
   const [txLoading, setTxLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'sui'|'usdc'>('sui');
 
   const { data: objData, isLoading, refetch } = useSuiClientQuery('getObject', {
     id, options: { showContent: true },
@@ -61,8 +63,10 @@ export default function EventPage() {
 
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
   const goalUsd = (goalUsdCents / 100).toFixed(2);
-  const poolMist: number = fields ? parseInt(fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
+  const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0') : 0;
   const poolSui = (poolMist / 1e9).toFixed(3);
+  const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
+  const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
   const isActive: boolean = fields?.active ?? true;
   const deadline: number = fields ? parseInt(fields.deadline) : 0;
   const onChainStatuses = parseStatuses(fields);
@@ -95,13 +99,24 @@ export default function EventPage() {
     if (!selectedName || !amountSui) return;
     setTxLoading(true);
     try {
-      const amountMist = BigInt(Math.round(parseFloat(amountSui) * 1e9));
-      const tipMist = tipSui ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
-      const tx = tipMist > 0n
-        ? buildContributeSuiWithTip({ eventId: id, name: selectedName, amountMist, tipMist })
-        : buildContributeSui({ eventId: id, name: selectedName, amountMist });
-      await execTx(tx);
-      setStatuses(prev => ({ ...prev, [selectedName]: 1 }));
+      if (paymentMethod === 'usdc') {
+        // Fetch user's USDC coins
+        const coins = await client.getCoins({ owner: account!.address, coinType: USDC_TYPE });
+        if (!coins.data.length) throw new Error('No USDC coins found in your wallet');
+        const usdcCoinId = coins.data[0].coinObjectId;
+        const amountUnits = BigInt(Math.round(parseFloat(amountSui) * 1e6)); // USDC 6 decimals
+        const tx = buildContributeUsdc({ eventId: id, name: selectedName, amountUnits, usdcCoinId });
+        await execTx(tx);
+        setStatuses(prev => ({ ...prev, [selectedName]: 3 }));
+      } else {
+        const amountMist = BigInt(Math.round(parseFloat(amountSui) * 1e9));
+        const tipMist = tipSui ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
+        const tx = tipMist > 0n
+          ? buildContributeSuiWithTip({ eventId: id, name: selectedName, amountMist, tipMist })
+          : buildContributeSui({ eventId: id, name: selectedName, amountMist });
+        await execTx(tx);
+        setStatuses(prev => ({ ...prev, [selectedName]: 1 }));
+      }
       setSelectedName('');
     } catch (err) { alert(String(err)); }
     finally { setTxLoading(false); }
@@ -124,11 +139,12 @@ export default function EventPage() {
       <p className="text-xs font-mono text-gray-500 mb-2 break-all">{id}</p>
       {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
 
-      <div className="grid grid-cols-4 gap-3 my-6">
+      <div className="grid grid-cols-5 gap-3 my-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Per person', value: perPersonSui ? `${perPersonSui.toFixed(2)} SUI` : `$${perPersonUsd.toFixed(2)}` },
-          { label: 'Pool', value: `${poolSui} SUI` },
+          { label: 'SUI Pool', value: `${poolSui} SUI` },
+          { label: 'USDC Pool', value: `$${poolUsdc}` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
           <div key={s.label} className="card p-3 text-center">
@@ -198,10 +214,21 @@ export default function EventPage() {
                   <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)} className={inputCls} />
                 </div>
               </div>
-              {!account && <p className="text-sm text-gray-500 mb-3 text-center">Connect wallet to pay with SUI</p>}
+              {/* Payment method toggle */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => setPaymentMethod('sui')}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='sui' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
+                  SUI
+                </button>
+                <button onClick={() => setPaymentMethod('usdc')}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='usdc' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
+                  USDC
+                </button>
+              </div>
+              {!account && <p className="text-sm text-gray-500 mb-3 text-center">Connect wallet to pay</p>}
               <button onClick={handleContribute} disabled={txLoading || !account}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 disabled:opacity-40 transition">
-                {txLoading ? 'Sending…' : 'Pay with SUI'}
+                {txLoading ? 'Sending…' : `Pay with ${paymentMethod === 'usdc' ? 'USDC' : 'SUI'}`}
               </button>
             </div>
           )}

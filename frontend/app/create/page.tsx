@@ -27,12 +27,17 @@ export default function CreatePage() {
   const [password, setPassword] = useState(() => generatePassword());
   const [goalUsd, setGoalUsd] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [includeOrganizer, setIncludeOrganizer] = useState(false);
+  const [organizerName, setOrganizerName] = useState('');
   const [loading, setLoading] = useState(false);
   const [eventId, setEventId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const nameList = names.split('\n').map(n => n.trim()).filter(Boolean);
+  const baseNameList = names.split('\n').map(n => n.trim()).filter(Boolean);
+  const nameList = includeOrganizer && organizerName.trim()
+    ? [...baseNameList, organizerName.trim()]
+    : baseNameList;
   const numParticipants = nameList.length;
   const goalNum = parseFloat(goalUsd) || 0;
   const perPersonUsd = numParticipants > 0 ? goalNum / numParticipants : 0;
@@ -194,6 +199,23 @@ export default function CreatePage() {
             className={inputCls} placeholder={"Alice\nBob\nCharlie"} required />
           {numParticipants > 0 && <p className="text-xs text-gray-500 mt-1">{numParticipants} participant{numParticipants > 1 ? 's' : ''}</p>}
         </div>
+        {/* Include organizer checkbox */}
+        <div className="flex items-start gap-3">
+          <input type="checkbox" id="includeOrganizer" checked={includeOrganizer}
+            onChange={e => setIncludeOrganizer(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded border border-white/20 bg-white/5 accent-blue-500 cursor-pointer" />
+          <div className="flex-1">
+            <label htmlFor="includeOrganizer" className="text-sm text-gray-300 cursor-pointer">
+              Include me as a participant
+            </label>
+            <p className="text-xs text-gray-600 mt-0.5">Shows your contribution on the list</p>
+            {includeOrganizer && (
+              <input type="text" value={organizerName} onChange={e => setOrganizerName(e.target.value)}
+                className={inputCls + " mt-2"} placeholder="Your name (as shown to participants)" required={includeOrganizer} />
+            )}
+          </div>
+        </div>
+
         <div>
           <label className={labelCls}>Password</label>
           <div className="flex gap-2">

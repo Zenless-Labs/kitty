@@ -12,6 +12,7 @@ move/build/
 # Environment
 .env.local
 .env.*.local
+.env.*.local
 
 # Sui publish artifacts (per-branch)
 

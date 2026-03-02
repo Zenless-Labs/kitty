@@ -3,6 +3,9 @@ import { Transaction } from '@mysten/sui/transactions';
 export const PACKAGE_ID = process.env.NEXT_PUBLIC_PACKAGE_ID ?? "0x_PLACEHOLDER";
 export const MODULE_NAME = 'kitty';
 
+// USDC on Sui mainnet
+export const USDC_TYPE = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC';
+
 export interface CreateEventParams {
   titleEncrypted: number[];
   encryptedParticipants: number[];
@@ -20,6 +23,13 @@ export interface ContributeParams {
 
 export interface ContributeWithTipParams extends ContributeParams {
   tipMist: bigint;
+}
+
+export interface ContributeUsdcParams {
+  eventId: string;
+  name: string;
+  amountUnits: bigint; // USDC has 6 decimals
+  usdcCoinId: string;  // object ID of USDC coin to use
 }
 
 export function buildCreateEvent(p: CreateEventParams): Transaction {
@@ -58,11 +68,31 @@ export function buildContributeSuiWithTip(p: ContributeWithTipParams): Transacti
   return tx;
 }
 
+export function buildContributeUsdc(p: ContributeUsdcParams): Transaction {
+  const tx = new Transaction();
+  const [coin] = tx.splitCoins(tx.object(p.usdcCoinId), [p.amountUnits]);
+  tx.moveCall({
+    target: `${PACKAGE_ID}::${MODULE_NAME}::contribute_usdc`,
+    typeArguments: [USDC_TYPE],
+    arguments: [tx.object(p.eventId), tx.pure.string(p.name), coin],
+  });
+  return tx;
+}
+
 export function buildMarkPaypal(eventId: string, name: string): Transaction {
   const tx = new Transaction();
   tx.moveCall({
     target: `${PACKAGE_ID}::${MODULE_NAME}::mark_paypal`,
     arguments: [tx.object(eventId), tx.pure.string(name)],
+  });
+  return tx;
+}
+
+export function buildMarkPaypalBatch(eventId: string, names: string[]): Transaction {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::${MODULE_NAME}::mark_paypal_batch`,
+    arguments: [tx.object(eventId), tx.pure.vector('string', names)],
   });
   return tx;
 }
@@ -81,15 +111,6 @@ export function buildCloseEvent(eventId: string): Transaction {
   tx.moveCall({
     target: `${PACKAGE_ID}::${MODULE_NAME}::close_event`,
     arguments: [tx.object(eventId)],
-  });
-  return tx;
-}
-
-export function buildMarkPaypalBatch(eventId: string, names: string[]): Transaction {
-  const tx = new Transaction();
-  tx.moveCall({
-    target: `${PACKAGE_ID}::${MODULE_NAME}::mark_paypal_batch`,
-    arguments: [tx.object(eventId), tx.pure.vector('string', names)],
   });
   return tx;
 }
