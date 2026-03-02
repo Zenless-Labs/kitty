@@ -8,7 +8,7 @@ const network = (process.env.NEXT_PUBLIC_SUI_NETWORK ?? 'testnet') as 'testnet' 
 const rpcUrl = process.env.NEXT_PUBLIC_SUI_RPC_URL ?? 'https://fullnode.testnet.sui.io:443';
 
 const { networkConfig } = createNetworkConfig({
-  [network]: { url: rpcUrl },
+  [network]: { url: rpcUrl, network },
 });
 
 export { network };
