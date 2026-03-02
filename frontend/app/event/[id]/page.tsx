@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
-import { buildContributeSui, buildContributeSuiWithTip, buildContributeUsdc, USDC_TYPE } from '@/lib/contract';
+import { buildContributeSui, buildContributeSuiWithTip, buildContributeCoin, USDC_TYPE } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 import { decryptEvent, parseStatuses, savePassword, loadPassword } from '@/lib/kitty';
 
@@ -104,8 +104,8 @@ export default function EventPage() {
         const coins = await client.getCoins({ owner: account!.address, coinType: USDC_TYPE });
         if (!coins.data.length) throw new Error('No USDC coins found in your wallet');
         const usdcCoinId = coins.data[0].coinObjectId;
-        const amountUnits = BigInt(Math.round(parseFloat(amountSui) * 1e6)); // USDC 6 decimals
-        const tx = buildContributeUsdc({ eventId: id, name: selectedName, amountUnits, usdcCoinId });
+        const amountUnits = BigInt(Math.round(parseFloat(amountSui) * 1e6));
+        const tx = buildContributeCoin({ eventId: id, name: selectedName, amountUnits, coinObjectId: usdcCoinId });
         await execTx(tx);
         setStatuses(prev => ({ ...prev, [selectedName]: 3 }));
       } else {
