@@ -115,7 +115,11 @@ export default function OrganizerPage() {
 
   async function handleWithdraw() {
     setTxLoading('withdraw');
-    try { await execTx(buildWithdraw(id)); }
+    try {
+      await execTx(buildWithdraw(id));
+      alert('Withdrawal successful!');
+      setTimeout(() => window.location.reload(), 1500);
+    }
     catch (err) { alert(String(err)); }
     finally { setTxLoading(null); }
   }
