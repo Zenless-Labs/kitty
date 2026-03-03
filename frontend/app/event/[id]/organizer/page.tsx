@@ -197,7 +197,7 @@ export default function OrganizerPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-3 gap-3 mb-3">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Raised', value: !isActive && totalRaisedUsd === 0 ? 'Withdrawn' : price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
