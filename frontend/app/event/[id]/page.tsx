@@ -31,6 +31,7 @@ export default function EventPage() {
   const [unlockError, setUnlockError] = useState('');
   const [selectedName, setSelectedName] = useState('');
   const [amountSui, setAmountSui] = useState('');
+  const [tipOption, setTipOption] = useState<'default'|'custom'|'none'>('default');
   const [tipSui, setTipSui] = useState('0.01');
   const [txLoading, setTxLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'sui'|'usdc'>('sui');
@@ -99,12 +100,24 @@ export default function EventPage() {
         if (!coins.data.length) throw new Error('No USDC coins found in your wallet');
         const usdcCoinId = coins.data[0].coinObjectId;
         const amountUnits = BigInt(Math.round(parseFloat(amountSui) * 1e6));
+        const tipMist = tipOption !== 'none' && parseFloat(tipSui) > 0
+          ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
+        // USDC contribution + optional SUI tip as separate txs
         const tx = buildContributeCoin({ eventId: id, name: selectedName, amountUnits, coinObjectId: usdcCoinId });
         await execTx(tx);
+        if (tipMist > 0n) {
+          // Send tip separately as SUI transfer to organizer
+          const { Transaction } = await import('@mysten/sui/transactions');
+          const tipTx = new Transaction();
+          const [tipCoin] = tipTx.splitCoins(tipTx.gas, [tipMist]);
+          tipTx.transferObjects([tipCoin], fields.organizer);
+          await execTx(tipTx);
+        }
         setStatuses(prev => ({ ...prev, [selectedName]: 3 }));
       } else {
         const amountMist = BigInt(Math.round(parseFloat(amountSui) * 1e9));
-        const tipMist = tipSui ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
+        const tipMist = tipOption !== 'none' && parseFloat(tipSui) > 0
+          ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
         const tx = tipMist > 0n
           ? buildContributeSuiWithTip({ eventId: id, name: selectedName, amountMist, tipMist })
           : buildContributeSui({ eventId: id, name: selectedName, amountMist });
@@ -233,15 +246,22 @@ export default function EventPage() {
                     className={inputCls}
                     placeholder={paymentMethod === 'usdc' ? perPersonUsd.toFixed(2) : (perPersonSui?.toFixed(3) ?? '0')} />
                 </div>
-                {paymentMethod === 'sui' && (
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Tip for organizer (SUI) — covers gas fees</label>
-                    <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)} className={inputCls} />
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Tip for organizer (SUI)</label>
+                  <div className="flex gap-2 mb-2">
+                    {(['default', 'custom', 'none'] as const).map(opt => (
+                      <button key={opt} type="button"
+                        onClick={() => { setTipOption(opt); if (opt === 'default') setTipSui('0.01'); if (opt === 'none') setTipSui('0'); }}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition ${tipOption === opt ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
+                        {opt === 'default' ? '0.01 SUI' : opt === 'custom' ? 'Custom' : 'No tip'}
+                      </button>
+                    ))}
                   </div>
-                )}
-                {paymentMethod === 'usdc' && (
-                  <p className="text-xs text-gray-600">Tip for organizer always in SUI — switch to SUI payment to add a tip.</p>
-                )}
+                  {tipOption === 'custom' && (
+                    <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)}
+                      className={inputCls} placeholder="Amount in SUI" />
+                  )}
+                </div>
               </div>
 
               {!account && <p className="text-sm text-gray-500 mb-3 text-center">Connect wallet to pay</p>}
