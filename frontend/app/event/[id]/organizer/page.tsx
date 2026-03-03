@@ -167,6 +167,7 @@ export default function OrganizerPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300 transition mb-8">← My Events</Link>
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>

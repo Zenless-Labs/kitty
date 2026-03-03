@@ -30,7 +30,7 @@ export default function EventPage() {
   const [statuses, setStatuses] = useState<Record<string, number>>({});
   const [unlockError, setUnlockError] = useState('');
   const [selectedName, setSelectedName] = useState('');
-  const [amountSui, setAmountSui] = useState('');
+  const [amount, setAmount] = useState('');
   const [tipOption, setTipOption] = useState<'default'|'custom'|'none'>('default');
   const [tipSui, setTipSui] = useState('0.01');
   const [txLoading, setTxLoading] = useState(false);
@@ -100,7 +100,7 @@ export default function EventPage() {
   }
 
   async function handleContribute() {
-    if (!selectedName || !amountSui) return;
+    if (!selectedName || !amount) return;
     setTxLoading(true);
     try {
       if (paymentMethod === 'usdc') {
@@ -108,7 +108,7 @@ export default function EventPage() {
         const coins = await client.getCoins({ owner: account!.address, coinType: USDC_TYPE });
         if (!coins.data.length) throw new Error('No USDC coins found in your wallet');
         const usdcCoinId = coins.data[0].coinObjectId;
-        const amountUnits = BigInt(Math.round(parseFloat(amountSui) * 1e6));
+        const amountUnits = BigInt(Math.round(parseFloat(amount) * 1e6));
         const tipMist = tipOption !== 'none' && parseFloat(tipSui) > 0
           ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
         // USDC contribution + optional SUI tip as separate txs
@@ -119,7 +119,7 @@ export default function EventPage() {
         }
         setStatuses(prev => ({ ...prev, [selectedName]: 3 }));
       } else {
-        const amountMist = BigInt(Math.round(parseFloat(amountSui) * 1e9));
+        const amountMist = BigInt(Math.round(parseFloat(amount) * 1e9));
         const tipMist = tipOption !== 'none' && parseFloat(tipSui) > 0
           ? BigInt(Math.round(parseFloat(tipSui) * 1e9)) : 0n;
         const tx = tipMist > 0n
@@ -202,7 +202,7 @@ export default function EventPage() {
                   return (
                     <tr key={name}
                       className={`border-b border-white/5 last:border-0 transition ${status === 0 && isActive ? 'cursor-pointer hover:bg-white/5' : ''} ${selectedName === name ? 'bg-blue-500/10' : ''}`}
-                      onClick={() => { if (status === 0 && isActive) { setSelectedName(name); if (paymentMethod === 'usdc') setAmountSui(perPersonUsd.toFixed(2)); else if (perPersonSui) setAmountSui(perPersonSui.toFixed(3)); } }}>
+                      onClick={() => { if (status === 0 && isActive) { setSelectedName(name); if (paymentMethod === 'usdc') setAmount(perPersonUsd.toFixed(2)); else if (perPersonSui) setAmount(perPersonSui.toFixed(3)); } }}>
                       <td className="px-4 py-3 font-medium text-white">{name}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.cls}`}>{s.label}</span>
@@ -226,11 +226,11 @@ export default function EventPage() {
 
               {/* Payment method toggle */}
               <div className="flex gap-2 mb-4">
-                <button onClick={() => { setPaymentMethod('usdc'); setAmountSui(perPersonUsd.toFixed(2)); }}
+                <button onClick={() => { setPaymentMethod('usdc'); setAmount(perPersonUsd.toFixed(2)); }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='usdc' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
                   USDC
                 </button>
-                <button onClick={() => { setPaymentMethod('sui'); setAmountSui(perPersonSui?.toFixed(3) ?? ''); }}
+                <button onClick={() => { setPaymentMethod('sui'); setAmount(perPersonSui?.toFixed(3) ?? ''); }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='sui' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
                   SUI
                 </button>
@@ -244,8 +244,8 @@ export default function EventPage() {
                   <input type="number"
                     step={paymentMethod === 'usdc' ? '0.01' : '0.001'}
                     min="0"
-                    value={amountSui}
-                    onChange={e => setAmountSui(e.target.value)}
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
                     className={inputCls}
                     placeholder={paymentMethod === 'usdc' ? perPersonUsd.toFixed(2) : (perPersonSui?.toFixed(3) ?? '0')} />
                 </div>
