@@ -62,6 +62,11 @@ export default function EventPage() {
   const poolSui = (poolMist / 1e9).toFixed(3);
   const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
   const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
+  const totalRaisedUsd = (() => {
+    const suiUsd = price ? (poolMist / 1e9) * price : 0;
+    const usdcUsd = poolUsdcRaw / 1e6;
+    return suiUsd + usdcUsd;
+  })();
   const isActive: boolean = fields?.active ?? true;
   const deadline: number = fields ? parseInt(fields.deadline) : 0;
   const onChainStatuses = parseStatuses(fields);
@@ -145,12 +150,11 @@ export default function EventPage() {
       )}
       {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
 
-      <div className="grid grid-cols-5 gap-3 my-6">
+      <div className="grid grid-cols-4 gap-3 my-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Per person', value: `$${perPersonUsd.toFixed(2)}` },
-          { label: 'SUI Pool', value: `${poolSui} SUI` },
-          { label: 'USDC Pool', value: `$${poolUsdc}` },
+          { label: 'Raised', value: price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
           <div key={s.label} className="card p-3 text-center">

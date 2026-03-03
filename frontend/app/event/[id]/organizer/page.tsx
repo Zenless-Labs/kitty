@@ -40,7 +40,14 @@ export default function OrganizerPage() {
   const fields = (objData?.data?.content as any)?.fields ?? null;
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
   const goalUsd = (goalUsdCents / 100).toFixed(2);
-  const poolMist: number = fields ? parseInt(fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
+  const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
+  const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
+  const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
+  const totalRaisedUsd = (() => {
+    const suiUsd = price ? (poolMist / 1e9) * price : 0;
+    const usdcUsd = poolUsdcRaw / 1e6;
+    return suiUsd + usdcUsd;
+  })();
   const tipMist: number = fields ? parseInt(fields.tip?.fields?.value ?? fields.tip ?? '0') : 0;
   const poolSui = (poolMist / 1e9).toFixed(3);
   const tipSui = (tipMist / 1e9).toFixed(3);
@@ -166,7 +173,7 @@ export default function OrganizerPage() {
         <div className="flex gap-2 shrink-0 ml-4">
           <button onClick={handleWithdraw} disabled={!!txLoading || poolMist === 0}
             className="px-4 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium hover:bg-green-500/30 disabled:opacity-40 transition">
-            {txLoading === 'withdraw' ? 'Withdrawing…' : `Withdraw ${poolSui} SUI`}
+            {txLoading === 'withdraw' ? 'Withdrawing…' : `Withdraw $${totalRaisedUsd.toFixed(2)}`}
           </button>
           {isActive && (
             <button onClick={handleClose} disabled={!!txLoading}
@@ -181,7 +188,7 @@ export default function OrganizerPage() {
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
-          { label: 'Pool', value: `${poolSui} SUI` },
+          { label: 'Raised', value: price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
           { label: 'Tips', value: `${tipSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
@@ -196,7 +203,7 @@ export default function OrganizerPage() {
       <div className="card p-4 mb-6">
         <div className="flex justify-between text-xs text-gray-400 mb-2">
           <span>SUI collected</span>
-          <span>{progress}%{goalSui ? ` · ${poolSui} / ${goalSui.toFixed(2)} SUI` : ''}</span>
+          <span>{progress}%{goalUsdCents > 0 ? ` · $${totalRaisedUsd.toFixed(2)} / $${(goalUsdCents/100).toFixed(2)}` : ''}</span>
         </div>
         <div className="w-full bg-white/5 rounded-full h-1.5">
           <div className="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all" style={{ width: `${progress}%` }} />
