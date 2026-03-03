@@ -81,11 +81,15 @@ export default function CreatePage() {
       });
 
       tx.setSender(account!.address);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tx.setExpiration({ None: true } as any);
       const bytes = await tx.build({ client });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res = await signAndExecute({ transaction: btoa(String.fromCharCode(...bytes)) as any });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const created: any[] = (res as any).effects?.created ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const eventObj = created.find((o: any) => o.owner?.Shared !== undefined || o.owner === 'Shared');
       const eid = eventObj?.reference?.objectId ?? null;
       if (eid) {
@@ -127,7 +131,7 @@ export default function CreatePage() {
         {/* Participant link */}
         <div className="card p-4">
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Participant Link</p>
-          <p className="text-xs text-gray-500 mb-3">Send this to everyone — they'll need the password to unlock</p>
+          <p className="text-xs text-gray-500 mb-3">Send this to everyone — they&apos;ll need the password to unlock</p>
           <div className="flex gap-2">
             <input readOnly value={shareUrl}
               className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none" />

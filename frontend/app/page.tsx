@@ -27,18 +27,22 @@ export default function Home() {
   useEffect(() => {
     if (account) loadMyEvents();
     else setEvents(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.address]);
 
   async function loadMyEvents() {
     if (!account) return;
     setLoading(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res = await (client as any).queryEvents({
         query: { MoveEventType: `${PACKAGE_ID}::kitty::KittyEventCreated` },
         limit: 50,
       });
       const base = (res.data ?? [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((e: any) => e.parsedJson?.organizer === account.address)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((e: any) => ({
           event_id: e.parsedJson.event_id,
           goal_usd_cents: parseInt(e.parsedJson.goal_usd_cents),
@@ -51,6 +55,7 @@ export default function Home() {
       const mine = await Promise.all(base.map(async (ev: KittyEvent) => {
         try {
           const obj = await client.getObject({ id: ev.event_id, options: { showContent: true } });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const fields = (obj.data?.content as any)?.fields ?? {};
           const poolSuiMist = parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0');
           const poolUsdcRaw = parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0');

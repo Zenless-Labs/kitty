@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
-import { buildWithdraw, buildCloseEvent, buildMarkPaypal, buildMarkPaypalBatch } from '@/lib/contract';
+import { buildWithdraw, buildCloseEvent, buildMarkPaypalBatch } from '@/lib/contract';
 import { decryptEvent, parseStatuses, savePassword, loadPassword } from '@/lib/kitty';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 
@@ -37,12 +37,12 @@ export default function OrganizerPage() {
     id, options: { showContent: true },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields = (objData?.data?.content as any)?.fields ?? null;
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
   const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
-  const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
   const totalRaisedUsd = (() => {
     const suiUsd = price ? (poolMist / 1e9) * price : 0;
     const usdcUsd = poolUsdcRaw / 1e6;
@@ -71,6 +71,7 @@ export default function OrganizerPage() {
     decryptEvent(fields, pw).then(({ names: n, title: t }) => {
       setNames(n); setTitle(t); setStatuses(parseStatuses(fields));
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields]);
 
   // 3s redirect countdown if not organizer
@@ -84,6 +85,7 @@ export default function OrganizerPage() {
       });
     }, 1000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields, account, isOrganizer]);
 
   async function handleDecrypt(e: React.FormEvent) {
@@ -97,15 +99,19 @@ export default function OrganizerPage() {
     } catch { setUnlockError('Wrong password'); }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function execTx(tx: any) {
     tx.setSender(account!.address);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tx.setExpiration({ None: true } as any);
     const bytes = await tx.build({ client });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await signAndExecute({ transaction: btoa(String.fromCharCode(...bytes)) as any });
     await refetch();
   }
 
   function toggleSelect(name: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     setSelected(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
   }
 

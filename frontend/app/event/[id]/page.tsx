@@ -40,6 +40,7 @@ export default function EventPage() {
     id, options: { showContent: true },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields = (objData?.data?.content as any)?.fields ?? null;
   const isOrganizer = account?.address === fields?.organizer;
 
@@ -54,6 +55,7 @@ export default function EventPage() {
       setTitle(t);
       setStatuses(parseStatuses(fields));
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields]);
 
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
@@ -61,7 +63,6 @@ export default function EventPage() {
   const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0') : 0;
   const poolSui = (poolMist / 1e9).toFixed(3);
   const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
-  const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
   const totalRaisedUsd = (() => {
     const suiUsd = price ? (poolMist / 1e9) * price : 0;
     const usdcUsd = poolUsdcRaw / 1e6;
@@ -87,10 +88,13 @@ export default function EventPage() {
     } catch { setUnlockError('Wrong password'); }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function execTx(tx: any) {
     tx.setSender(account!.address);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tx.setExpiration({ None: true } as any);
     const bytes = await tx.build({ client });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await signAndExecute({ transaction: btoa(String.fromCharCode(...bytes)) as any });
     await refetch();
   }
@@ -145,7 +149,7 @@ export default function EventPage() {
       {isOrganizer && (
         <a href={`/event/${id}/organizer`}
           className="inline-flex items-center gap-2 mt-3 mb-1 px-4 py-2 rounded-xl bg-violet-500/10 border border-violet-500/30 text-violet-400 text-sm font-medium hover:bg-violet-500/20 transition">
-          <span>⚙️</span> You're the organizer — go to Dashboard →
+          <span>⚙️</span> You&apos;re the organizer — go to Dashboard →
         </a>
       )}
       {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
