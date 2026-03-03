@@ -44,6 +44,7 @@ export default function OrganizerPage() {
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
   const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
+  const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
   const totalRaisedUsd = (() => {
     const suiUsd = price ? (poolMist / 1e9) * price : 0;
     const usdcUsd = poolUsdcRaw / 1e6;
@@ -193,10 +194,12 @@ export default function OrganizerPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-6 gap-3 mb-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Raised', value: price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
+          { label: 'SUI', value: `${poolSui}` },
+          { label: 'USDC', value: `$${poolUsdc}` },
           { label: 'Tips', value: `${tipSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
