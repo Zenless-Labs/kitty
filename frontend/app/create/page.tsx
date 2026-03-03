@@ -201,7 +201,21 @@ export default function CreatePage() {
           <label className={labelCls}>Participants (one per line)</label>
           <textarea value={names} onChange={e => setNames(e.target.value)} rows={5}
             className={inputCls} placeholder={"Alice\nBob\nCharlie"} required />
-          {numParticipants > 0 && <p className="text-xs text-gray-500 mt-1">{numParticipants} participant{numParticipants > 1 ? 's' : ''}</p>}
+          {/* Live participant preview */}
+          {nameList.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {baseNameList.map((name, i) => (
+                <span key={i} className="px-2.5 py-1 rounded-full bg-white/8 border border-white/10 text-xs text-gray-300">
+                  {name}
+                </span>
+              ))}
+              {includeOrganizer && organizerName.trim() && (
+                <span className="px-2.5 py-1 rounded-full bg-violet-500/20 border border-violet-500/30 text-xs text-violet-300 font-medium">
+                  👑 {organizerName.trim()} (you)
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {/* Include organizer checkbox */}
         <div className="flex items-start gap-3">
