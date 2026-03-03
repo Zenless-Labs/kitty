@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
 import { buildContributeSui, buildContributeSuiWithTip, buildContributeCoin, USDC_TYPE } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
@@ -16,7 +16,6 @@ const STATUS = {
 
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { price, usdToSui } = useSuiPrice();
@@ -42,11 +41,6 @@ export default function EventPage() {
 
   const fields = (objData?.data?.content as any)?.fields ?? null;
   const isOrganizer = account?.address === fields?.organizer;
-
-  // Auto-redirect organizer to dashboard
-  useEffect(() => {
-    if (fields && isOrganizer) router.replace(`/event/${id}/organizer`);
-  }, [fields, isOrganizer]);
 
   // Auto-decrypt from URL param or localStorage on load
   useEffect(() => {
@@ -124,10 +118,8 @@ export default function EventPage() {
 
   const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
 
-  if (isLoading || (fields && isOrganizer)) return (
-    <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">
-      {isOrganizer ? 'Redirecting to dashboard…' : 'Loading…'}
-    </div>
+  if (isLoading) return (
+    <div className="max-w-2xl mx-auto px-6 py-32 text-center text-gray-500">Loading…</div>
   );
   if (!fields) return <div className="max-w-2xl mx-auto px-6 py-32 text-center text-red-400">Event not found</div>;
 
@@ -137,6 +129,12 @@ export default function EventPage() {
         ? <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">{title}</h1>
         : <h1 className="text-3xl font-bold mb-1 text-gray-200">Event</h1>}
       <p className="text-xs font-mono text-gray-500 mb-2 break-all">{id}</p>
+      {isOrganizer && (
+        <a href={`/event/${id}/organizer`}
+          className="inline-flex items-center gap-2 mt-3 mb-1 px-4 py-2 rounded-xl bg-violet-500/10 border border-violet-500/30 text-violet-400 text-sm font-medium hover:bg-violet-500/20 transition">
+          <span>⚙️</span> You're the organizer — go to Dashboard →
+        </a>
+      )}
       {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
 
       <div className="grid grid-cols-5 gap-3 my-6">
