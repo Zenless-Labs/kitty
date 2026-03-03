@@ -171,9 +171,9 @@ export default function CreatePage() {
         </div>
 
         <div className="flex gap-3">
-          <a href={`/event/${eventId}/organizer`}
+          <a href={`/event/${eventId}`}
             className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white text-center font-semibold hover:opacity-90 transition">
-            Open Dashboard →
+            Go to Event →
           </a>
           <button onClick={() => { setEventId(null); setTitle(''); setNames(''); setPassword(generatePassword()); setGoalUsd(''); setDeadline(''); }}
             className="px-6 py-3 rounded-xl border border-white/10 text-gray-300 font-medium hover:border-white/30 transition">
