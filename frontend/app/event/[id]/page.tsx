@@ -155,13 +155,11 @@ export default function EventPage() {
       )}
       {!isActive && <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
 
-      <div className="grid grid-cols-6 gap-3 my-6">
+      <div className="grid grid-cols-4 gap-3 mt-6 mb-3">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Per person', value: `$${perPersonUsd.toFixed(2)}` },
-          { label: 'Raised', value: price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
-          { label: 'SUI', value: `${poolSui}` },
-          { label: 'USDC', value: `$${poolUsdc}` },
+          { label: 'Raised', value: !isActive && totalRaisedUsd === 0 ? 'Withdrawn' : price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
           <div key={s.label} className="card p-3 text-center">
@@ -169,6 +167,13 @@ export default function EventPage() {
             <p className="font-semibold text-sm text-white">{s.value}</p>
           </div>
         ))}
+      </div>
+      <div className="card p-3 mb-6">
+        <p className="text-xs text-gray-500 mb-2">Current pool balance</p>
+        <div className="flex gap-6">
+          <div><p className="text-xs text-gray-600">SUI</p><p className="text-sm font-semibold text-white">{poolSui}</p></div>
+          <div><p className="text-xs text-gray-600">USDC</p><p className="text-sm font-semibold text-white">${poolUsdc}</p></div>
+        </div>
       </div>
 
       {deadline > 0 && <p className="text-sm text-gray-500 mb-6">Deadline: {new Date(deadline).toLocaleDateString()}</p>}

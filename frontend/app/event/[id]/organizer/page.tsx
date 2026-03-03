@@ -195,12 +195,10 @@ export default function OrganizerPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-3">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
-          { label: 'Raised', value: price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
-          { label: 'SUI', value: `${poolSui}` },
-          { label: 'USDC', value: `$${poolUsdc}` },
+          { label: 'Raised', value: !isActive && totalRaisedUsd === 0 ? 'Withdrawn' : price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
           { label: 'Tips', value: `${tipSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
@@ -209,6 +207,13 @@ export default function OrganizerPage() {
             <p className="font-semibold text-sm text-white">{s.value}</p>
           </div>
         ))}
+      </div>
+      <div className="card p-3 mb-6">
+        <p className="text-xs text-gray-500 mb-2">Current pool balance</p>
+        <div className="flex gap-6">
+          <div><p className="text-xs text-gray-600">SUI</p><p className="text-sm font-semibold text-white">{poolSui}</p></div>
+          <div><p className="text-xs text-gray-600">USDC</p><p className="text-sm font-semibold text-white">${poolUsdc}</p></div>
+        </div>
       </div>
 
       {/* Progress */}
