@@ -64,6 +64,8 @@ export default function EventPage() {
   const poolSui = (poolMist / 1e9).toFixed(3);
   const poolUsdcRaw: number = fields ? parseInt(fields.pool_coin?.fields?.value ?? fields.pool_coin ?? '0') : 0;
   const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
+  const tipPoolMist: number = fields ? parseInt(fields.tip?.fields?.value ?? fields.tip ?? '0') : 0;
+  const tipPoolSui = (tipPoolMist / 1e9).toFixed(3);
   const totalRaisedUsd = (() => {
     const suiUsd = price ? (poolMist / 1e9) * price : 0;
     const usdcUsd = poolUsdcRaw / 1e6;
@@ -170,9 +172,10 @@ export default function EventPage() {
       </div>
       <div className="card p-3 mb-6">
         <p className="text-xs text-gray-500 mb-2">Current pool balance</p>
-        <div className="flex gap-6">
+        <div className="grid grid-cols-3 gap-4">
           <div><p className="text-xs text-gray-600">SUI</p><p className="text-sm font-semibold text-white">{poolSui}</p></div>
           <div><p className="text-xs text-gray-600">USDC</p><p className="text-sm font-semibold text-white">${poolUsdc}</p></div>
+          <div><p className="text-xs text-gray-600">Tips</p><p className="text-sm font-semibold text-white">{tipPoolSui} SUI</p></div>
         </div>
       </div>
 
