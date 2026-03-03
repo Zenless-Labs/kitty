@@ -74,7 +74,7 @@ export default function Home() {
   return (
     <div className="max-w-2xl mx-auto px-6 py-24">
       <div className="text-center mb-16">
-        <div className="text-5xl mb-4">🐱</div>
+        <img src="/logo.jpg" alt="Kitty" className="w-24 h-24 rounded-2xl object-cover mx-auto mb-4 shadow-lg shadow-violet-500/20" />
         <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">
           Kitty
         </h1>
