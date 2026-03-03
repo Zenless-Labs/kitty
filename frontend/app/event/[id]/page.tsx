@@ -172,7 +172,7 @@ export default function EventPage() {
       </div>
       <div className="card p-3 mb-6">
         <p className="text-xs text-gray-500 mb-2">Current pool balance</p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 text-center">
           <div><p className="text-xs text-gray-600">SUI</p><p className="text-sm font-semibold text-white">{poolSui}</p></div>
           <div><p className="text-xs text-gray-600">USDC</p><p className="text-sm font-semibold text-white">${poolUsdc}</p></div>
           <div><p className="text-xs text-gray-600">Tips</p><p className="text-sm font-semibold text-white">{tipPoolSui} SUI</p></div>
