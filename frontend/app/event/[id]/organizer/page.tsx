@@ -12,6 +12,7 @@ const STATUS = {
   0: { label: 'Pending',  cls: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
   1: { label: 'SUI ✓',   cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
   2: { label: 'PayPal ✓',cls: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  3: { label: 'USDC ✓',  cls: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' },
 } as Record<number, {label:string;cls:string}>;
 
 export default function OrganizerPage() {
@@ -264,7 +265,7 @@ export default function OrganizerPage() {
               <tbody>
                 {names.map(name => {
                   const status = resolvedStatuses[name] ?? 0;
-                  const s = STATUS[status];
+                  const s = STATUS[status] ?? { label: `Code ${status}`, cls: 'bg-gray-500/10 text-gray-400 border border-gray-500/20' };
                   const isSelected = selected.has(name);
                   return (
                     <tr key={name}
