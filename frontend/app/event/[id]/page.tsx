@@ -148,7 +148,7 @@ export default function EventPage() {
       <div className="grid grid-cols-5 gap-3 my-6">
         {[
           { label: 'Goal', value: `$${goalUsd}` },
-          { label: 'Per person', value: perPersonSui ? `${perPersonSui.toFixed(2)} SUI` : `$${perPersonUsd.toFixed(2)}` },
+          { label: 'Per person', value: `$${perPersonUsd.toFixed(2)}` },
           { label: 'SUI Pool', value: `${poolSui} SUI` },
           { label: 'USDC Pool', value: `$${poolUsdc}` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
