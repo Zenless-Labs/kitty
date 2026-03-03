@@ -201,6 +201,16 @@ module kitty::kitty {
         if (all_paid) { kitty_event.active = false; };
     }
 
+    /// Anyone can add a SUI tip to cover organizer tx fees.
+    public entry fun add_tip<T>(
+        kitty_event: &mut KittyEvent<T>,
+        tip: Coin<SUI>,
+        _ctx: &mut TxContext,
+    ) {
+        assert!(kitty_event.active, EEventClosed);
+        kitty_event.tip.join(coin::into_balance(tip));
+    }
+
     /// Organizer closes the event.
     public entry fun close_event<T>(
         kitty_event: &mut KittyEvent<T>,

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
-import { buildContributeSui, buildContributeSuiWithTip, buildContributeCoin, USDC_TYPE } from '@/lib/contract';
+import { buildContributeSui, buildContributeSuiWithTip, buildContributeCoin, buildAddTip, USDC_TYPE } from '@/lib/contract';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 import { decryptEvent, parseStatuses, savePassword, loadPassword } from '@/lib/kitty';
 
@@ -106,12 +106,7 @@ export default function EventPage() {
         const tx = buildContributeCoin({ eventId: id, name: selectedName, amountUnits, coinObjectId: usdcCoinId });
         await execTx(tx);
         if (tipMist > 0n) {
-          // Send tip separately as SUI transfer to organizer
-          const { Transaction } = await import('@mysten/sui/transactions');
-          const tipTx = new Transaction();
-          const [tipCoin] = tipTx.splitCoins(tipTx.gas, [tipMist]);
-          tipTx.transferObjects([tipCoin], fields.organizer);
-          await execTx(tipTx);
+          await execTx(buildAddTip(id, tipMist));
         }
         setStatuses(prev => ({ ...prev, [selectedName]: 3 }));
       } else {
@@ -247,7 +242,7 @@ export default function EventPage() {
                     placeholder={paymentMethod === 'usdc' ? perPersonUsd.toFixed(2) : (perPersonSui?.toFixed(3) ?? '0')} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1.5 block">Tip for organizer (SUI)</label>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Tip for organizer (SUI) — helps cover tx fees 🙏</label>
                   <div className="flex gap-2 mb-2">
                     {(['default', 'custom', 'none'] as const).map(opt => (
                       <button key={opt} type="button"

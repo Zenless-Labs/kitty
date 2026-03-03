@@ -128,3 +128,14 @@ export function buildCloseEvent(eventId: string, coinType = USDC_TYPE): Transact
   });
   return tx;
 }
+
+export function buildAddTip(eventId: string, tipMist: bigint, coinType = USDC_TYPE): Transaction {
+  const tx = new Transaction();
+  const [tip] = tx.splitCoins(tx.gas, [tipMist]);
+  tx.moveCall({
+    target: `${PACKAGE_ID}::${MODULE_NAME}::add_tip`,
+    typeArguments: [coinType],
+    arguments: [tx.object(eventId), tip],
+  });
+  return tx;
+}
