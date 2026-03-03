@@ -218,11 +218,11 @@ export default function EventPage() {
 
               {/* Payment method toggle */}
               <div className="flex gap-2 mb-4">
-                <button onClick={() => setPaymentMethod('sui')}
+                <button onClick={() => { setPaymentMethod('sui'); setAmountSui(perPersonSui?.toFixed(3) ?? ''); }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='sui' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
                   SUI
                 </button>
-                <button onClick={() => setPaymentMethod('usdc')}
+                <button onClick={() => { setPaymentMethod('usdc'); setAmountSui(perPersonUsd.toFixed(2)); }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='usdc' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
                   USDC
                 </button>
