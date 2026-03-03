@@ -62,7 +62,7 @@ export default function OrganizerPage() {
   const paidCount = Object.values(resolvedStatuses).filter(s => s > 0).length;
   const totalCount = names?.length ?? Object.keys(resolvedStatuses).length;
   const goalSui = price ? (goalUsdCents / 100 / price) : null;
-  const progress = goalSui && poolMist > 0 ? Math.min(100, Math.round((poolMist / 1e9 / goalSui) * 100)) : 0;
+  const progress = goalUsdCents > 0 && totalRaisedUsd > 0 ? Math.min(100, Math.round((totalRaisedUsd / (goalUsdCents / 100)) * 100)) : 0;
   const pending = (names ?? []).filter(n => (resolvedStatuses[n] ?? 0) === 0);
 
   // Auto-decrypt from URL param or localStorage
@@ -181,7 +181,7 @@ export default function OrganizerPage() {
           {!isActive && <span className="mt-1 inline-block text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full">Closed</span>}
         </div>
         <div className="flex gap-2 shrink-0 ml-4">
-          <button onClick={handleWithdraw} disabled={!!txLoading || poolMist === 0}
+          <button onClick={handleWithdraw} disabled={!!txLoading || totalRaisedUsd === 0}
             className="px-4 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium hover:bg-green-500/30 disabled:opacity-40 transition">
             {txLoading === 'withdraw' ? 'Withdrawing…' : `Withdraw $${totalRaisedUsd.toFixed(2)}`}
           </button>
