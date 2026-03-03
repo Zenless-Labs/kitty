@@ -201,7 +201,6 @@ export default function OrganizerPage() {
         {[
           { label: 'Goal', value: `$${goalUsd}` },
           { label: 'Raised', value: !isActive && totalRaisedUsd === 0 ? 'Withdrawn' : price ? `$${totalRaisedUsd.toFixed(2)}` : `${poolSui} SUI` },
-          { label: 'Tips', value: `${tipSui} SUI` },
           { label: 'Paid', value: `${paidCount}/${totalCount}` },
         ].map(s => (
           <div key={s.label} className="card p-3 text-center">
