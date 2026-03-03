@@ -213,7 +213,7 @@ export default function OrganizerPage() {
       {/* Progress */}
       <div className="card p-4 mb-6">
         <div className="flex justify-between text-xs text-gray-400 mb-2">
-          <span>SUI collected</span>
+          <span>Progress</span>
           <span>{progress}%{goalUsdCents > 0 ? ` · $${totalRaisedUsd.toFixed(2)} / $${(goalUsdCents/100).toFixed(2)}` : ''}</span>
         </div>
         <div className="w-full bg-white/5 rounded-full h-1.5">
