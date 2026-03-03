@@ -34,7 +34,7 @@ export default function EventPage() {
   const [tipOption, setTipOption] = useState<'default'|'custom'|'none'>('default');
   const [tipSui, setTipSui] = useState('0.01');
   const [txLoading, setTxLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'sui'|'usdc'>('sui');
+  const [paymentMethod, setPaymentMethod] = useState<'sui'|'usdc'>('usdc');
 
   const { data: objData, isLoading, refetch } = useSuiClientQuery('getObject', {
     id, options: { showContent: true },
@@ -202,7 +202,7 @@ export default function EventPage() {
                   return (
                     <tr key={name}
                       className={`border-b border-white/5 last:border-0 transition ${status === 0 && isActive ? 'cursor-pointer hover:bg-white/5' : ''} ${selectedName === name ? 'bg-blue-500/10' : ''}`}
-                      onClick={() => { if (status === 0 && isActive) { setSelectedName(name); if (perPersonSui) setAmountSui(perPersonSui.toFixed(3)); } }}>
+                      onClick={() => { if (status === 0 && isActive) { setSelectedName(name); if (paymentMethod === 'usdc') setAmountSui(perPersonUsd.toFixed(2)); else if (perPersonSui) setAmountSui(perPersonSui.toFixed(3)); } }}>
                       <td className="px-4 py-3 font-medium text-white">{name}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.cls}`}>{s.label}</span>
@@ -226,13 +226,13 @@ export default function EventPage() {
 
               {/* Payment method toggle */}
               <div className="flex gap-2 mb-4">
-                <button onClick={() => { setPaymentMethod('sui'); setAmountSui(perPersonSui?.toFixed(3) ?? ''); }}
-                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='sui' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
-                  SUI
-                </button>
                 <button onClick={() => { setPaymentMethod('usdc'); setAmountSui(perPersonUsd.toFixed(2)); }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='usdc' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
                   USDC
+                </button>
+                <button onClick={() => { setPaymentMethod('sui'); setAmountSui(perPersonSui?.toFixed(3) ?? ''); }}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition ${paymentMethod==='sui' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}>
+                  SUI
                 </button>
               </div>
 
