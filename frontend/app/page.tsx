@@ -58,7 +58,7 @@ export default function Home() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const fields = (obj.data?.content as any)?.fields ?? {};
           const poolSuiMist = parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0');
-          const poolUsdcRaw = parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0');
+          const poolUsdcRaw = parseInt(fields.pool_coin?.fields?.value ?? fields.pool_coin ?? '0');
           return { ...ev, poolSuiMist, poolUsdcRaw };
         } catch { return ev; }
       }));

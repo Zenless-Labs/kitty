@@ -62,7 +62,7 @@ export default function EventPage() {
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0') : 0;
   const poolSui = (poolMist / 1e9).toFixed(3);
-  const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
+  const poolUsdcRaw: number = fields ? parseInt(fields.pool_coin?.fields?.value ?? fields.pool_coin ?? '0') : 0;
   const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
   const totalRaisedUsd = (() => {
     const suiUsd = price ? (poolMist / 1e9) * price : 0;

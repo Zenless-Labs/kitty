@@ -44,7 +44,7 @@ export default function OrganizerPage() {
   const goalUsdCents: number = fields ? parseInt(fields.goal_usd_cents) : 0;
   const goalUsd = (goalUsdCents / 100).toFixed(2);
   const poolMist: number = fields ? parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? fields.pool?.fields?.value ?? fields.pool ?? '0') : 0;
-  const poolUsdcRaw: number = fields ? parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0') : 0;
+  const poolUsdcRaw: number = fields ? parseInt(fields.pool_coin?.fields?.value ?? fields.pool_coin ?? '0') : 0;
   const poolUsdc = (poolUsdcRaw / 1e6).toFixed(2);
   const totalRaisedUsd = (() => {
     const suiUsd = price ? (poolMist / 1e9) * price : 0;
