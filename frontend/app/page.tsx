@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
+import { useSuiPrice } from '@/lib/useSuiPrice';
 import { PACKAGE_ID } from '@/lib/contract';
 
 interface KittyEvent {
@@ -11,6 +12,8 @@ interface KittyEvent {
   deadline: number;
   createdAt: number;
   txDigest: string;
+  poolSuiMist?: number;
+  poolUsdcRaw?: number;
 }
 
 export default function Home() {
@@ -19,6 +22,7 @@ export default function Home() {
   const [events, setEvents] = useState<KittyEvent[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [eventId, setEventId] = useState('');
+  const { price: suiPrice } = useSuiPrice();
 
   useEffect(() => {
     if (account) loadMyEvents();
@@ -33,7 +37,7 @@ export default function Home() {
         query: { MoveEventType: `${PACKAGE_ID}::kitty::KittyEventCreated` },
         limit: 50,
       });
-      const mine = (res.data ?? [])
+      const base = (res.data ?? [])
         .filter((e: any) => e.parsedJson?.organizer === account.address)
         .map((e: any) => ({
           event_id: e.parsedJson.event_id,
@@ -42,6 +46,17 @@ export default function Home() {
           createdAt: parseInt(e.timestampMs ?? '0'),
           txDigest: e.id?.txDigest ?? '',
         }));
+
+      // Fetch pool balances for each event
+      const mine = await Promise.all(base.map(async (ev: KittyEvent) => {
+        try {
+          const obj = await client.getObject({ id: ev.event_id, options: { showContent: true } });
+          const fields = (obj.data?.content as any)?.fields ?? {};
+          const poolSuiMist = parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0');
+          const poolUsdcRaw = parseInt(fields.pool_usdc?.fields?.value ?? fields.pool_usdc ?? '0');
+          return { ...ev, poolSuiMist, poolUsdcRaw };
+        } catch { return ev; }
+      }));
       setEvents(mine);
     } catch (err) {
       console.error(err);
@@ -101,9 +116,9 @@ export default function Home() {
           {events && events.length > 0 && (
             <div className="space-y-2">
               {events.map(ev => (
-                <Link key={ev.event_id} href={`/event/${ev.event_id}/organizer`}
+                <Link key={ev.event_id} href={`/event/${ev.event_id}`}
                   className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 hover:bg-white/8 transition group">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-mono text-gray-400 group-hover:text-gray-300 transition">
                       {ev.event_id.slice(0, 10)}…{ev.event_id.slice(-6)}
                     </p>
@@ -112,9 +127,16 @@ export default function Home() {
                         {ev.deadline > 0 && ` · Due ${new Date(ev.deadline).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`}
                       </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-white">${(ev.goal_usd_cents / 100).toFixed(2)}</p>
-                    <p className="text-xs text-violet-400 mt-0.5">Dashboard →</p>
+                  <div className="text-right ml-4 shrink-0">
+                    <p className="text-sm font-semibold text-white">Goal: ${(ev.goal_usd_cents / 100).toFixed(2)}</p>
+                    {(() => {
+                      const suiUsd = suiPrice && ev.poolSuiMist ? (ev.poolSuiMist / 1e9) * suiPrice : 0;
+                      const usdcUsd = ev.poolUsdcRaw ? ev.poolUsdcRaw / 1e6 : 0;
+                      const total = suiUsd + usdcUsd;
+                      return total > 0
+                        ? <p className="text-xs text-green-400 mt-0.5">Raised: ${total.toFixed(2)}</p>
+                        : <p className="text-xs text-gray-600 mt-0.5">Nothing raised yet</p>;
+                    })()}
                   </div>
                 </Link>
               ))}
