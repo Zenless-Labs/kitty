@@ -168,6 +168,9 @@ export default function EventPage() {
         </div>
       ) : (
         <div className="space-y-4">
+          <p className="text-sm text-gray-500 mb-3">
+            👇 Pick your name from the list to chip in — or pay on someone else&apos;s behalf 🙂
+          </p>
           <div className="card overflow-hidden">
             <table className="w-full text-sm">
               <thead className="border-b border-white/10">
@@ -198,20 +201,13 @@ export default function EventPage() {
           {selectedName && isActive && (
             <div className="card p-5">
               <h2 className="font-semibold text-white mb-1">Contributing as <span className="text-blue-400">{selectedName}</span></h2>
-              {perPersonSui && price && (
+              {perPersonSui && price && paymentMethod === 'sui' && (
                 <p className="text-sm text-gray-500 mb-4">Suggested {perPersonSui.toFixed(3)} SUI ≈ ${perPersonUsd.toFixed(2)} · SUI ${price.toFixed(3)}</p>
               )}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Amount (SUI)</label>
-                  <input type="number" step="0.001" min="0" value={amountSui} onChange={e => setAmountSui(e.target.value)}
-                    className={inputCls} placeholder={perPersonSui?.toFixed(3) ?? '0'} />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Tip for organizer</label>
-                  <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)} className={inputCls} />
-                </div>
-              </div>
+              {perPersonUsd > 0 && paymentMethod === 'usdc' && (
+                <p className="text-sm text-gray-500 mb-4">Suggested ${perPersonUsd.toFixed(2)} USDC</p>
+              )}
+
               {/* Payment method toggle */}
               <div className="flex gap-2 mb-4">
                 <button onClick={() => setPaymentMethod('sui')}
@@ -223,6 +219,31 @@ export default function EventPage() {
                   USDC
                 </button>
               </div>
+
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">
+                    Amount ({paymentMethod === 'usdc' ? 'USDC' : 'SUI'})
+                  </label>
+                  <input type="number"
+                    step={paymentMethod === 'usdc' ? '0.01' : '0.001'}
+                    min="0"
+                    value={amountSui}
+                    onChange={e => setAmountSui(e.target.value)}
+                    className={inputCls}
+                    placeholder={paymentMethod === 'usdc' ? perPersonUsd.toFixed(2) : (perPersonSui?.toFixed(3) ?? '0')} />
+                </div>
+                {paymentMethod === 'sui' && (
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Tip for organizer (SUI) — covers gas fees</label>
+                    <input type="number" step="0.01" min="0" value={tipSui} onChange={e => setTipSui(e.target.value)} className={inputCls} />
+                  </div>
+                )}
+                {paymentMethod === 'usdc' && (
+                  <p className="text-xs text-gray-600">Tip for organizer always in SUI — switch to SUI payment to add a tip.</p>
+                )}
+              </div>
+
               {!account && <p className="text-sm text-gray-500 mb-3 text-center">Connect wallet to pay</p>}
               <button onClick={handleContribute} disabled={txLoading || !account}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold hover:opacity-90 disabled:opacity-40 transition">
