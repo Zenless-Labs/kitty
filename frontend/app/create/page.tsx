@@ -214,8 +214,11 @@ export default function CreatePage() {
             </label>
             <p className="text-xs text-gray-600 mt-0.5">Shows your contribution on the list</p>
             {includeOrganizer && (
-              <input type="text" value={organizerName} onChange={e => setOrganizerName(e.target.value)}
-                className={inputCls + " mt-2"} placeholder="Your name (as shown to participants)" required={includeOrganizer} />
+              <div className="mt-2">
+                <input type="text" value={organizerName} onChange={e => setOrganizerName(e.target.value)}
+                  className={inputCls} placeholder="Your name e.g. Alice" required={includeOrganizer} />
+                <p className="text-xs text-gray-600 mt-1">This name will be appended to the participant list</p>
+              </div>
             )}
           </div>
         </div>
