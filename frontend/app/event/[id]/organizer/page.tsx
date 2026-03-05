@@ -209,25 +209,6 @@ export default function OrganizerPage() {
           </div>
         ))}
       </div>
-      <div className="card p-3 mb-6">
-        <p className="text-xs text-gray-500 mb-2">Current pool balance</p>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div><p className="text-xs text-gray-600">SUI</p><p className="text-sm font-semibold text-white">{poolSui}</p></div>
-          <div><p className="text-xs text-gray-600">USDC</p><p className="text-sm font-semibold text-white">${poolUsdc}</p></div>
-          <div><p className="text-xs text-gray-600">Tips</p><p className="text-sm font-semibold text-white">{tipPoolSui} SUI</p></div>
-        </div>
-      </div>
-
-      {/* Progress */}
-      <div className="card p-4 mb-6">
-        <div className="flex justify-between text-xs text-gray-400 mb-2">
-          <span>Progress</span>
-          <span>{progress}%{goalUsdCents > 0 ? ` · $${totalRaisedUsd.toFixed(2)} / $${(goalUsdCents/100).toFixed(2)}` : ''}</span>
-        </div>
-        <div className="w-full bg-white/5 rounded-full h-1.5">
-          <div className="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all" style={{ width: `${progress}%` }} />
-        </div>
-      </div>
 
       {/* Participants — decrypt inline */}
       {!names ? (
