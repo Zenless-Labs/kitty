@@ -44,9 +44,9 @@ export default function CreatePage() {
   const perPersonUsd = numParticipants > 0 ? goalNum / numParticipants : 0;
   const perPersonSui = usdToSui(perPersonUsd);
 
-  const shareUrl = eventId
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}`
-    : '';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const shareUrl = eventId ? baseUrl + '/event/' + eventId + (includePw ? '?pw=' + encodeURIComponent(password) : '') : '';
+
   const organizerUrl = eventId
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/event/${eventId}/organizer`
     : '';
