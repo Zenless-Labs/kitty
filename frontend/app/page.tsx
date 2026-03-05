@@ -42,10 +42,16 @@ export default function Home() {
     if (!account) return;
     setLoading(true);
     try {
+      // Query both KittyEventCreated (v1/v2) and KittyEventCreatedV2 (v3/v4) across all packages
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allResults = await Promise.all(ALL_PACKAGE_IDS.map(pkgId =>
-        (client as any).queryEvents({ query: { MoveEventType: `${pkgId}::kitty::KittyEventCreated` }, limit: 50 })
-      ));
+      const allResults = await Promise.all([
+        ...ALL_PACKAGE_IDS.map(pkgId =>
+          (client as any).queryEvents({ query: { MoveEventType: `${pkgId}::kitty::KittyEventCreated` }, limit: 50 })
+        ),
+        ...ALL_PACKAGE_IDS.map(pkgId =>
+          (client as any).queryEvents({ query: { MoveEventType: `${pkgId}::kitty::KittyEventCreatedV2` }, limit: 50 })
+        ),
+      ]);
       const seen = new Set<string>();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allEvents = allResults.flatMap((r: any) => r.data ?? []).filter((e: any) => {
