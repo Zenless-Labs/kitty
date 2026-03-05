@@ -60,7 +60,7 @@ export default function Home() {
           const fields = (obj.data?.content as any)?.fields ?? {};
           const poolSuiMist = parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0');
           const poolUsdcRaw = parseInt(fields.pool_coin?.fields?.value ?? fields.pool_coin ?? '0');
-          const isOpen = fields.is_open ?? true;
+          const isOpen = fields.active ?? true;
           return { ...ev, poolSuiMist, poolUsdcRaw, isOpen };
         } catch { return ev; }
       }));
