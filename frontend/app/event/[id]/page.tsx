@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useSignAndExecuteTransaction, useCurrentAccount, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
 import { buildContributeSui, buildContributeSuiWithTip, buildContributeCoin, buildAddTip, USDC_TYPE } from '@/lib/contract';
@@ -25,6 +26,7 @@ export default function EventPage() {
   });
 
   const [password, setPassword] = useState('');
+  const searchParams = useSearchParams();
   const [names, setNames] = useState<string[] | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, number>>({});
@@ -47,7 +49,7 @@ export default function EventPage() {
   // Auto-decrypt from URL param or localStorage on load
   useEffect(() => {
     if (!fields || names !== null) return;
-    const pw = loadPassword(id);
+    const pw = searchParams.get('pw') || loadPassword(id);
     if (!pw) return;
     setPassword(pw);
     decryptEvent(fields, pw).then(({ names: n, title: t }) => {

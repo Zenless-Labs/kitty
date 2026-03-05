@@ -25,6 +25,7 @@ export default function CreatePage() {
   const [title, setTitle] = useState('');
   const [names, setNames] = useState('');
   const [password, setPassword] = useState(() => generatePassword());
+  const [includePw, setIncludePw] = useState(false);
   const [goalUsd, setGoalUsd] = useState('');
   const [deadline, setDeadline] = useState('');
   const [includeOrganizer, setIncludeOrganizer] = useState(false);
@@ -140,6 +141,11 @@ export default function CreatePage() {
               {copied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
+          <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+            <input type="checkbox" checked={includePw} onChange={e => setIncludePw(e.target.checked)}
+              className="w-4 h-4 rounded accent-blue-500" />
+            <span className="text-xs text-gray-400">Include password in link <span className="text-gray-600">(easier on mobile — anyone with the link can open it)</span></span>
+          </label>
         </div>
 
         {/* Organizer dashboard link */}
