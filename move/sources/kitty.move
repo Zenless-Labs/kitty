@@ -117,12 +117,6 @@ module kitty::kitty {
             active: true,
         };
 
-        event::emit(KittyEventCreated {
-            event_id: object::id(&kitty_event),
-            organizer: ctx.sender(),
-            goal_usd_cents,
-            deadline,
-        });
         event::emit(KittyEventCreatedV2 {
             event_id: object::id(&kitty_event),
             organizer: ctx.sender(),

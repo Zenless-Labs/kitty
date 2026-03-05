@@ -8,8 +8,9 @@ import { PACKAGE_ID } from '@/lib/contract';
 
 const ALL_PACKAGE_IDS = [
   PACKAGE_ID,
-  '0x0b0afb87c57d53ee79aee3252da9379b1025be9f517ca4f4e338ba2f1a7d6b85',
-  '0x43f567db67ef8f0d2c84a470277bbff3c46c36393fe32d5325d70169b5b7f820',
+  '0xdde343b4f166b80ebf885107af3e726340a57ceb5d47ccc331c11a7c65dbfb11', // v3
+  '0x0b0afb87c57d53ee79aee3252da9379b1025be9f517ca4f4e338ba2f1a7d6b85', // v2
+  '0x43f567db67ef8f0d2c84a470277bbff3c46c36393fe32d5325d70169b5b7f820', // v1
 ];
 
 interface KittyEvent {
