@@ -14,6 +14,7 @@ interface KittyEvent {
   txDigest: string;
   poolSuiMist?: number;
   poolUsdcRaw?: number;
+  isOpen?: boolean;
 }
 
 export default function Home() {
@@ -59,7 +60,8 @@ export default function Home() {
           const fields = (obj.data?.content as any)?.fields ?? {};
           const poolSuiMist = parseInt(fields.pool_sui?.fields?.value ?? fields.pool_sui ?? '0');
           const poolUsdcRaw = parseInt(fields.pool_coin?.fields?.value ?? fields.pool_coin ?? '0');
-          return { ...ev, poolSuiMist, poolUsdcRaw };
+          const isOpen = fields.is_open ?? true;
+          return { ...ev, poolSuiMist, poolUsdcRaw, isOpen };
         } catch { return ev; }
       }));
       setEvents(mine);
@@ -138,6 +140,8 @@ export default function Home() {
                       const suiUsd = suiPrice && ev.poolSuiMist ? (ev.poolSuiMist / 1e9) * suiPrice : 0;
                       const usdcUsd = ev.poolUsdcRaw ? ev.poolUsdcRaw / 1e6 : 0;
                       const total = suiUsd + usdcUsd;
+                      if (!ev.isOpen && total === 0) return <p className="text-xs text-orange-400 mt-0.5">Closed · Withdrawn</p>;
+                      if (!ev.isOpen) return <p className="text-xs text-orange-400 mt-0.5">Closed · Raised: ${total.toFixed(2)}</p>;
                       return total > 0
                         ? <p className="text-xs text-green-400 mt-0.5">Raised: ${total.toFixed(2)}</p>
                         : <p className="text-xs text-gray-600 mt-0.5">Nothing raised yet</p>;
