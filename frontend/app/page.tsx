@@ -47,7 +47,7 @@ export default function Home() {
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pkgIds = Array.from(new Set<string>([PACKAGE_ID, ...(deployTxs.data ?? []).flatMap((tx: any) =>
-        (tx.objectChanges ?? []).filter((c: any) => c.type === 'published').map((c: any) => c.packageId)
+        (tx.objectChanges ?? []).filter((c: any) => c.type === 'published' || c.type === 'upgraded').map((c: any) => c.packageId)
       ).filter(Boolean)]));
 
       // Query both event types across all discovered packages
