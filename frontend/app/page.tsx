@@ -6,12 +6,8 @@ import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 import { PACKAGE_ID } from '@/lib/contract';
 
-const ALL_PACKAGE_IDS = [
-  PACKAGE_ID,
-  '0xdde343b4f166b80ebf885107af3e726340a57ceb5d47ccc331c11a7c65dbfb11', // v3
-  '0x0b0afb87c57d53ee79aee3252da9379b1025be9f517ca4f4e338ba2f1a7d6b85', // v2
-  '0x43f567db67ef8f0d2c84a470277bbff3c46c36393fe32d5325d70169b5b7f820', // v1
-];
+// Zenless Labs deployer address — used to discover all published package versions
+const DEPLOYER = '0xae3addc38fb0356b287f2fae2e7857a015f1526dfa5d0ece9fc6ab2e48879274';
 
 interface KittyEvent {
   event_id: string;
@@ -42,13 +38,26 @@ export default function Home() {
     if (!account) return;
     setLoading(true);
     try {
-      // Query both KittyEventCreated (v1/v2) and KittyEventCreatedV2 (v3/v4) across all packages
+      // Discover all published package versions from deployer tx history
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const deployTxs = await (client as any).queryTransactionBlocks({
+        filter: { FromAddress: DEPLOYER },
+        options: { showObjectChanges: true },
+        limit: 50,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pkgIds = Array.from(new Set<string>([PACKAGE_ID, ...(deployTxs.data ?? []).flatMap((tx: any) =>
+        (tx.objectChanges ?? []).filter((c: any) => c.type === 'published').map((c: any) => c.packageId)
+      ).filter(Boolean)]));
+
+      // Query both event types across all discovered packages
       const allResults = await Promise.all([
-        ...ALL_PACKAGE_IDS.map(pkgId =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...pkgIds.map((pkgId: string) =>
           (client as any).queryEvents({ query: { MoveEventType: `${pkgId}::kitty::KittyEventCreated` }, limit: 50 })
         ),
-        ...ALL_PACKAGE_IDS.map(pkgId =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...pkgIds.map((pkgId: string) =>
           (client as any).queryEvents({ query: { MoveEventType: `${pkgId}::kitty::KittyEventCreatedV2` }, limit: 50 })
         ),
       ]);
