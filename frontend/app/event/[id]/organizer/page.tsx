@@ -145,7 +145,7 @@ export default function OrganizerPage() {
   async function handleClose() {
     if (!confirm('Close this event?')) return;
     setTxLoading('close');
-    try { await execTx(buildCloseEvent(id)); }
+    try { await execTx(buildCloseEvent(id)); setTimeout(() => window.location.reload(), 1500); }
     catch (err) { alert(String(err)); }
     finally { setTxLoading(null); }
   }
