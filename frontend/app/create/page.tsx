@@ -119,7 +119,7 @@ export default function CreatePage() {
   const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
   const labelCls = "block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider";
 
-  const pwLine = !includePw ? '\n\n🔑 Password: ' + password : '';
+  const pwLine = !includePw ? '\n\n🔑 Password: ' + password : '\n\n🔒 Password is embedded in the link — be careful who you share it with.';
   const slackMsg = '🐱 *' + (title || 'Kitty') + '* — chip in!\n\nGoal: $' + goalNum.toFixed(2) + ' (' + numParticipants + ' people, $' + perPersonUsd.toFixed(2) + ' each)\n\n👉 ' + shareUrl + pwLine;
   // Show share UI after creation
   if (eventId) return (
