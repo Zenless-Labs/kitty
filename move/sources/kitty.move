@@ -37,13 +37,50 @@ module kitty::kitty {
         active: bool,
     }
 
-    // === Events ===
+    // === Analytics Events ===
 
     public struct KittyEventCreated has copy, drop {
         event_id: ID,
         organizer: address,
         goal_usd_cents: u64,
         deadline: u64,
+    }
+
+    /// Extended analytics event emitted alongside KittyEventCreated.
+    public struct KittyEventCreatedV2 has copy, drop {
+        event_id: ID,
+        organizer: address,
+        goal_usd_cents: u64,
+        participant_count: u64,
+        has_deadline: bool,
+    }
+
+    /// Emitted on every contribution (SUI, USDC, or PayPal mark).
+    /// payment_type: 1=SUI, 2=PayPal, 3=coin
+    /// amount_mist: raw on-chain units (mist for SUI, raw for coin); 0 for PayPal
+    public struct KittyContribution has copy, drop {
+        event_id: ID,
+        payment_type: u8,
+        amount_mist: u64,
+    }
+
+    /// Emitted when the event is closed (manually or auto).
+    public struct KittyClosed has copy, drop {
+        event_id: ID,
+        all_paid: bool,
+    }
+
+    // === Helpers ===
+
+    fun count_all_paid<T>(kitty_event: &KittyEvent<T>): bool {
+        let n = kitty_event.statuses.size();
+        let mut idx = 0;
+        while (idx < n) {
+            let (_, v) = kitty_event.statuses.get_entry_by_idx(idx);
+            if (*v == 0u8) return false;
+            idx = idx + 1;
+        };
+        true
     }
 
     // === Functions ===
@@ -57,6 +94,7 @@ module kitty::kitty {
         deadline: u64,
         ctx: &mut TxContext,
     ) {
+        let participant_count = names.length() as u64;
         let mut statuses = vec_map::empty<String, u8>();
         let mut i = 0;
         while (i < names.length()) {
@@ -85,6 +123,13 @@ module kitty::kitty {
             goal_usd_cents,
             deadline,
         });
+        event::emit(KittyEventCreatedV2 {
+            event_id: object::id(&kitty_event),
+            organizer: ctx.sender(),
+            goal_usd_cents,
+            participant_count,
+            has_deadline: deadline > 0,
+        });
 
         transfer::share_object(kitty_event);
     }
@@ -99,8 +144,14 @@ module kitty::kitty {
         assert!(kitty_event.active, EEventClosed);
         assert!(kitty_event.statuses.contains(&name), ENameNotFound);
         assert!(*kitty_event.statuses.get(&name) == 0, EAlreadyContributed);
+        let amount = payment.value();
         *kitty_event.statuses.get_mut(&name) = 1u8;
         kitty_event.pool_sui.join(coin::into_balance(payment));
+        event::emit(KittyContribution {
+            event_id: object::id(kitty_event),
+            payment_type: 1,
+            amount_mist: amount,
+        });
     }
 
     /// Contribute SUI + tip.
@@ -114,9 +165,15 @@ module kitty::kitty {
         assert!(kitty_event.active, EEventClosed);
         assert!(kitty_event.statuses.contains(&name), ENameNotFound);
         assert!(*kitty_event.statuses.get(&name) == 0, EAlreadyContributed);
+        let amount = payment.value();
         *kitty_event.statuses.get_mut(&name) = 1u8;
         kitty_event.pool_sui.join(coin::into_balance(payment));
         kitty_event.tip.join(coin::into_balance(tip_coin));
+        event::emit(KittyContribution {
+            event_id: object::id(kitty_event),
+            payment_type: 1,
+            amount_mist: amount,
+        });
     }
 
     /// Contribute alt coin (USDC or any T).
@@ -129,8 +186,14 @@ module kitty::kitty {
         assert!(kitty_event.active, EEventClosed);
         assert!(kitty_event.statuses.contains(&name), ENameNotFound);
         assert!(*kitty_event.statuses.get(&name) == 0, EAlreadyContributed);
+        let amount = payment.value();
         *kitty_event.statuses.get_mut(&name) = 3u8;
         kitty_event.pool_coin.join(coin::into_balance(payment));
+        event::emit(KittyContribution {
+            event_id: object::id(kitty_event),
+            payment_type: 3,
+            amount_mist: amount,
+        });
     }
 
     /// Organizer marks a participant as paid via PayPal.
@@ -144,6 +207,11 @@ module kitty::kitty {
         assert!(kitty_event.statuses.contains(&name), ENameNotFound);
         assert!(*kitty_event.statuses.get(&name) == 0, EAlreadyContributed);
         *kitty_event.statuses.get_mut(&name) = 2u8;
+        event::emit(KittyContribution {
+            event_id: object::id(kitty_event),
+            payment_type: 2,
+            amount_mist: 0,
+        });
     }
 
     /// Organizer marks multiple participants as paid via PayPal in one tx.
@@ -159,6 +227,11 @@ module kitty::kitty {
             let name = names[i];
             if (kitty_event.statuses.contains(&name) && *kitty_event.statuses.get(&name) == 0) {
                 *kitty_event.statuses.get_mut(&name) = 2u8;
+                event::emit(KittyContribution {
+                    event_id: object::id(kitty_event),
+                    payment_type: 2,
+                    amount_mist: 0,
+                });
             };
             i = i + 1;
         };
@@ -190,15 +263,14 @@ module kitty::kitty {
         };
 
         // Auto-close if all paid
-        let n = kitty_event.statuses.size();
-        let mut all_paid = true;
-        let mut idx = 0;
-        while (idx < n) {
-            let (_, v) = kitty_event.statuses.get_entry_by_idx(idx);
-            if (*v == 0u8) { all_paid = false; break };
-            idx = idx + 1;
+        let all_paid = count_all_paid(kitty_event);
+        if (all_paid) {
+            kitty_event.active = false;
+            event::emit(KittyClosed {
+                event_id: object::id(kitty_event),
+                all_paid: true,
+            });
         };
-        if (all_paid) { kitty_event.active = false; };
     }
 
     /// Anyone can add a SUI tip to cover organizer tx fees.
@@ -217,6 +289,11 @@ module kitty::kitty {
         ctx: &mut TxContext,
     ) {
         assert!(kitty_event.organizer == ctx.sender(), ENotOrganizer);
+        let all_paid = count_all_paid(kitty_event);
         kitty_event.active = false;
+        event::emit(KittyClosed {
+            event_id: object::id(kitty_event),
+            all_paid,
+        });
     }
 }
