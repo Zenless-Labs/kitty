@@ -119,6 +119,8 @@ export default function CreatePage() {
   const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition";
   const labelCls = "block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider";
 
+  const pwLine = !includePw ? '\n\n🔑 Password: ' + password : '';
+  const slackMsg = '🐱 *' + (title || 'Kitty') + '* — chip in!\n\nGoal: $' + goalNum.toFixed(2) + ' (' + numParticipants + ' people, $' + perPersonUsd.toFixed(2) + ' each)\n\n👉 ' + shareUrl + pwLine;
   // Show share UI after creation
   if (eventId) return (
     <div className="max-w-lg mx-auto px-6 py-12">
@@ -167,9 +169,9 @@ export default function CreatePage() {
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Ready to paste in Slack / Telegram</p>
           <div className="flex gap-2">
             <textarea readOnly rows={4}
-              value={`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\n🔑 Password: ${password}`}
+              value={slackMsg}
               className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none resize-none" />
-            <button onClick={() => copyToClipboard(`🐱 *${title || 'Kitty'}* — chip in!\n\nGoal: $${goalNum.toFixed(2)} (${numParticipants} people, $${perPersonUsd.toFixed(2)} each)\n\n👉 ${shareUrl}\n\n🔑 Password: ${password}`)}
+            <button onClick={() => copyToClipboard(slackMsg)}
               className="px-4 py-2 rounded-xl bg-white/10 text-gray-300 border border-white/10 text-sm hover:bg-white/15 transition self-start whitespace-nowrap">
               Copy
             </button>
