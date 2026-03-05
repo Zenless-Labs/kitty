@@ -6,6 +6,12 @@ import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useSuiPrice } from '@/lib/useSuiPrice';
 import { PACKAGE_ID } from '@/lib/contract';
 
+const ALL_PACKAGE_IDS = [
+  PACKAGE_ID,
+  '0x0b0afb87c57d53ee79aee3252da9379b1025be9f517ca4f4e338ba2f1a7d6b85',
+  '0x43f567db67ef8f0d2c84a470277bbff3c46c36393fe32d5325d70169b5b7f820',
+];
+
 interface KittyEvent {
   event_id: string;
   goal_usd_cents: number;
@@ -36,11 +42,17 @@ export default function Home() {
     setLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (client as any).queryEvents({
-        query: { MoveEventType: `${PACKAGE_ID}::kitty::KittyEventCreated` },
-        limit: 50,
+      const allResults = await Promise.all(ALL_PACKAGE_IDS.map(pkgId =>
+        (client as any).queryEvents({ query: { MoveEventType: `${pkgId}::kitty::KittyEventCreated` }, limit: 50 })
+      ));
+      const seen = new Set<string>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allEvents = allResults.flatMap((r: any) => r.data ?? []).filter((e: any) => {
+        const id = e.parsedJson?.event_id;
+        if (!id || seen.has(id)) return false;
+        seen.add(id); return true;
       });
-      const base = (res.data ?? [])
+      const base = allEvents
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((e: any) => e.parsedJson?.organizer === account.address)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
