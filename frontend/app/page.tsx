@@ -141,9 +141,9 @@ export default function Home() {
                       const usdcUsd = ev.poolUsdcRaw ? ev.poolUsdcRaw / 1e6 : 0;
                       const total = suiUsd + usdcUsd;
                       if (!ev.isOpen && total === 0) return <p className="text-xs text-orange-400 mt-0.5">Closed · Withdrawn</p>;
-                      if (!ev.isOpen) return <p className="text-xs text-orange-400 mt-0.5">Closed · Raised: ${total.toFixed(2)}</p>;
+                      if (!ev.isOpen) return <p className="text-xs text-orange-400 mt-0.5">Closed · In Pool: ${total.toFixed(2)}</p>;
                       return total > 0
-                        ? <p className="text-xs text-green-400 mt-0.5">Raised: ${total.toFixed(2)}</p>
+                        ? <p className="text-xs text-green-400 mt-0.5">In Pool: ${total.toFixed(2)}</p>
                         : <p className="text-xs text-gray-600 mt-0.5">Nothing raised yet</p>;
                     })()}
                   </div>
